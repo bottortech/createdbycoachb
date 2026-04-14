@@ -54,7 +54,7 @@ export const STOPS: GalleryStop[] = [
   // Closing
   { pos: [16.5, 1.7, GZ],    lookAt: [19, 1.9, GZ],          label: "Professor WiggleWoo",   tier: 1 },
   // Service pedestals — last stop before loop restarts
-  { pos: [15.5, 2.8, GZ + 0.8], lookAt: [17.5, 0.4, GZ],      label: "Services",              tier: 2 },
+  { pos: [14, 3.2, GZ + 1.5], lookAt: [17.5, 0.4, GZ],        label: "Services",              tier: 2 },
 ];
 
 const LAST = STOPS.length - 1;

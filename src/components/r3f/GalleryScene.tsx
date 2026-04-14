@@ -182,8 +182,9 @@ export default function GalleryScene() {
           const isFirst = stopIdx === 0;
           const isHero = stopIdx <= 2 || tier === 1;
           const isGoat = STOPS[stopIdx]?.label === "The Standard";
-          const settleTime = isFirst ? 15 : isGoat ? 50 : (isHero ? SETTLE_HERO : SETTLE_STD);
-          const holdDuration = isFirst ? 20 : isGoat ? 50 : (HOLD_TIER[tier] || 50);
+          const isServices = STOPS[stopIdx]?.label === "Services";
+          const settleTime = isFirst ? 15 : isServices ? 15 : isGoat ? 50 : (isHero ? SETTLE_HERO : SETTLE_STD);
+          const holdDuration = isFirst ? 20 : isServices ? 40 : isGoat ? 50 : (HOLD_TIER[tier] || 50);
 
           if (holdTimer >= settleTime + holdDuration) {
             // Done with this stop — move to next
