@@ -256,6 +256,7 @@ interface GalleryRoomProps {
   onSelectProject: (p: Project) => void;
   modalOpen: boolean;
   targetProgress: number;
+  targetRef: { current: number };
   autoTour: boolean;
   cameraDisabled?: boolean;
   snapping?: boolean;
@@ -270,6 +271,7 @@ export default function GalleryRoom({
   onSelectProject,
   modalOpen,
   targetProgress,
+  targetRef,
   autoTour,
   onProgressChange,
   onLabelChange,
@@ -297,35 +299,40 @@ export default function GalleryRoom({
     wallTex.repeat.set(2, 1); ceilingTex.repeat.set(3, 1); floorTex.repeat.set(4, 2);
   }, [wallTex, ceilingTex, floorTex]);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     if (cameraDisabled) return;
 
+    const target = targetRef.current;
+    const dt = Math.min(delta, 0.1); // clamp for tab-refocus safety
+
     // Loop reset detection
-    if (smoothProgress.current - targetProgress > 2) {
-      smoothProgress.current = targetProgress;
-      smoothLook.current = targetProgress;
+    if (smoothProgress.current - target > 2) {
+      smoothProgress.current = target;
+      smoothLook.current = target;
     }
 
-    // Eased position lerp
-    const atStop = Math.abs(targetProgress - Math.round(targetProgress)) < 0.02;
-    const posLerp = snapping ? 0.12 : (atStop ? 0.06 : 0.025);
-    smoothProgress.current += (targetProgress - smoothProgress.current) * posLerp;
-    if (Math.abs(smoothProgress.current - targetProgress) < 0.01) {
-      smoothProgress.current = targetProgress;
+    // Frame-rate independent exponential lerp
+    const atStop = Math.abs(target - Math.round(target)) < 0.02;
+    const posRate = snapping ? 8 : (atStop ? 8 : 25);
+    const posLerp = 1 - Math.exp(-posRate * dt);
+    smoothProgress.current += (target - smoothProgress.current) * posLerp;
+    if (Math.abs(smoothProgress.current - target) < 0.005) {
+      smoothProgress.current = target;
       if (snapping) onSnapDone?.();
     }
 
-    // Eased lookAt lerp
-    const lookLerp = snapping ? 0.15 : 0.07;
-    smoothLook.current += (targetProgress - smoothLook.current) * lookLerp;
-    if (Math.abs(smoothLook.current - targetProgress) < 0.01) smoothLook.current = targetProgress;
+    // Look lerp — slightly faster than position for natural look-ahead
+    const lookRate = snapping ? 10 : (atStop ? 10 : 30);
+    const lookLerp = 1 - Math.exp(-lookRate * dt);
+    smoothLook.current += (target - smoothLook.current) * lookLerp;
+    if (Math.abs(smoothLook.current - target) < 0.005) smoothLook.current = target;
 
     // Camera position
     getCamera(smoothProgress.current, camPos.current, camLook.current);
     camera.position.copy(camPos.current);
 
     // Micro drift during hold — very subtle breathing motion
-    const moveDelta = Math.abs(targetProgress - smoothProgress.current);
+    const moveDelta = Math.abs(target - smoothProgress.current);
     if (moveDelta < 0.05 && !snapping) {
       const t = clock.getElapsedTime();
       camera.position.x += Math.sin(t * 0.2) * 0.008;

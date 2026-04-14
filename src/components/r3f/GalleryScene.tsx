@@ -1,6 +1,6 @@
 "use client";
 
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -12,8 +12,123 @@ import GalleryMap from "./GalleryMap";
 type PanelType = "enterprise" | "studio" | "appointments" | "commission" | "connect" | null;
 
 const LAST = STOPS.length - 1;
-const DEFAULT_SPEED = 0.165;
+const DEFAULT_SPEED = 0.5;
 
+/* ------------------------------------------------------------------ */
+/*  TourController — frame-synced auto-tour with delta-time drift      */
+/* ------------------------------------------------------------------ */
+
+function TourController({
+  targetRef, syncTarget, snapRef, autoSpeed,
+  entered, autoTour, anyOverlayOpen, loopResetFlag,
+}: {
+  targetRef: { current: number };
+  syncTarget: (v: number) => void;
+  snapRef: { current: boolean };
+  autoSpeed: number;
+  entered: boolean;
+  autoTour: boolean;
+  anyOverlayOpen: boolean;
+  loopResetFlag: { current: boolean };
+}) {
+  const stopIdx = useRef(0);
+  const holdTime = useRef(0);
+  const phase = useRef<"drift" | "pause">("pause");
+  const syncTimer = useRef(0);
+  const wasActive = useRef(false);
+
+  useFrame((_, rawDelta) => {
+    const isActive = entered && autoTour && !anyOverlayOpen;
+
+    if (!isActive) {
+      wasActive.current = false;
+      return;
+    }
+
+    // Just became active — reset tour
+    if (!wasActive.current) {
+      wasActive.current = true;
+      stopIdx.current = 0;
+      holdTime.current = 0;
+      phase.current = "pause";
+      targetRef.current = 0;
+      syncTarget(0);
+      return;
+    }
+
+    const dt = Math.min(rawDelta, 0.1); // clamp for tab-refocus safety
+
+    // Loop restart
+    if (loopResetFlag.current) {
+      loopResetFlag.current = false;
+      stopIdx.current = 0;
+      holdTime.current = 0;
+      phase.current = "pause";
+      targetRef.current = 0;
+      syncTarget(0);
+      return;
+    }
+
+    if (phase.current === "pause") {
+      holdTime.current += dt;
+      targetRef.current = Math.max(0, Math.min(LAST, stopIdx.current));
+      snapRef.current = true;
+
+      // Hold timing (seconds) — matches original 50ms-tick pacing exactly
+      const tier = STOPS[stopIdx.current]?.tier || 3;
+      const isFirst = stopIdx.current === 0;
+      const isGoat = STOPS[stopIdx.current]?.label === "The Standard";
+      const isServices = STOPS[stopIdx.current]?.label === "Services";
+
+      const settleTime = isFirst ? 0.4 : isServices ? 0.75 : isGoat ? 2.5 : 1.0;
+      const holdDuration = isFirst ? 0.6 : isServices ? 2.0 : isGoat ? 2.5
+        : (tier === 1 ? 1.75 : tier === 2 ? 2.0 : 1.5);
+
+      if (holdTime.current >= settleTime + holdDuration) {
+        holdTime.current = 0;
+        snapRef.current = false;
+        stopIdx.current++;
+
+        if (stopIdx.current > LAST) {
+          stopIdx.current = LAST;
+          phase.current = "pause";
+        } else if (stopIdx.current === LAST) {
+          targetRef.current = LAST;
+          phase.current = "pause";
+        } else {
+          phase.current = "drift";
+        }
+      }
+    } else {
+      // Smooth drift — advances every render frame using delta time
+      const current = targetRef.current;
+      const goal = stopIdx.current;
+      const from = goal - 1;
+      const segmentProgress = Math.max(0, Math.min(1, (current - from) / (goal - from)));
+
+      // Subtle ease-in-out: camera gently accelerates then decelerates each segment
+      const ease = 1 - 0.1 * Math.cos(segmentProgress * Math.PI);
+      const segmentSpeed = goal === 1 ? autoSpeed * 1.5 : autoSpeed; // first turn is faster
+      const next = current + segmentSpeed * ease * dt;
+
+      if (next >= goal - 0.02) {
+        targetRef.current = goal;
+        phase.current = "pause";
+      } else {
+        targetRef.current = Math.min(next, goal);
+      }
+    }
+
+    // Sync React state for progress bar (~15fps, avoids excessive re-renders)
+    syncTimer.current += dt;
+    if (syncTimer.current > 0.066) {
+      syncTimer.current = 0;
+      syncTarget(targetRef.current);
+    }
+  });
+
+  return null;
+}
 
 export default function GalleryScene() {
   const [entered, setEntered] = useState(false);
@@ -36,8 +151,6 @@ export default function GalleryScene() {
   const [target, setTarget] = useState(0);
   const scrollAccum = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const autoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   const anyOverlayOpen = !!selectedProject || !!activePanel;
 
   // Sync ref with state (ref for non-render reads, state for passing to Canvas)
@@ -56,12 +169,11 @@ export default function GalleryScene() {
   }, []);
 
   const restartTour = useCallback(() => {
-    updateTarget(0);
-    snapRef.current = false;
-    setMode("guided");
+    updateTarget(1); // go to Main Gallery view
+    snapRef.current = true;
+    setMode("manual"); // hand control to the user after one loop
     mapAutoShown.current = false;
-    loopResetFlag.current = true; // signal the state machine to restart
-    setMapOpen(false); // close the gallery map — it will reopen at Main Gallery
+    setMapOpen(true); // open map so user can browse
   }, [updateTarget]);
 
   // LOOP RULE: Only loop when camera has ACTUALLY arrived at the book (progress >= 0.95)
@@ -144,84 +256,6 @@ export default function GalleryScene() {
     const t = setTimeout(() => { if (!entered) handleEnter(); }, 6000);
     return () => clearTimeout(t);
   }, [entered, handleEnter]);
-
-  // Auto-tour: slowly increment target
-  useEffect(() => {
-    if (autoIntervalRef.current) { clearInterval(autoIntervalRef.current); autoIntervalRef.current = null; }
-
-    if (autoTour && entered && !anyOverlayOpen) {
-      let stopIdx = 0;                // which stop we're heading to / at
-      let holdTimer = 0;
-      let phase: "drift" | "pause" = "pause"; // start paused at stop 0
-
-      const HOLD_TIER: Record<number, number> = { 1: 35, 2: 40, 3: 30 };
-      const SETTLE_HERO = 20;
-      const SETTLE_STD = 20;
-
-      // Start at stop 0
-      updateTarget(0);
-
-      autoIntervalRef.current = setInterval(() => {
-        // Check if a loop restart was requested
-        if (loopResetFlag.current) {
-          loopResetFlag.current = false;
-          stopIdx = 0;
-          holdTimer = 0;
-          phase = "pause";
-          updateTarget(0);
-          return;
-        }
-
-        if (phase === "pause") {
-          // Settling + holding at the current stop
-          holdTimer++;
-          updateTarget(stopIdx);
-          snapRef.current = true;
-
-          const tier = STOPS[stopIdx]?.tier || 3;
-          const isFirst = stopIdx === 0;
-          const isHero = stopIdx <= 2 || tier === 1;
-          const isGoat = STOPS[stopIdx]?.label === "The Standard";
-          const isServices = STOPS[stopIdx]?.label === "Services";
-          const settleTime = isFirst ? 15 : isServices ? 15 : isGoat ? 50 : (isHero ? SETTLE_HERO : SETTLE_STD);
-          const holdDuration = isFirst ? 20 : isServices ? 40 : isGoat ? 50 : (HOLD_TIER[tier] || 50);
-
-          if (holdTimer >= settleTime + holdDuration) {
-            // Done with this stop — move to next
-            holdTimer = 0;
-            snapRef.current = false;
-            stopIdx++;
-
-            if (stopIdx > LAST) {
-              // Stay at LAST — the progress-based loop rule handles the restart
-              stopIdx = LAST;
-              phase = "pause";
-            } else if (stopIdx === LAST) {
-              // Snap directly to the last piece — no drift
-              updateTarget(LAST);
-              phase = "pause";
-            } else {
-              phase = "drift";
-            }
-          }
-        } else {
-          // Drifting toward the next stop
-          const current = targetRef.current;
-          const target = stopIdx;
-          const next = current + autoSpeed * 0.05;
-
-          if (next >= target - 0.02) {
-            // Arrived — switch to pause
-            updateTarget(target);
-            phase = "pause";
-          } else {
-            updateTarget(Math.min(next, target));
-          }
-        }
-      }, 50);
-    }
-    return () => { if (autoIntervalRef.current) clearInterval(autoIntervalRef.current); };
-  }, [autoTour, entered, anyOverlayOpen, updateTarget, autoSpeed]);
 
   // Scroll: accumulate and advance by fractions
   useEffect(() => {
@@ -318,11 +352,22 @@ export default function GalleryScene() {
         gl={{ antialias: true, alpha: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8 }}
         style={{ background: "#050403" }}
       >
+        <TourController
+          targetRef={targetRef}
+          syncTarget={setTarget}
+          snapRef={snapRef}
+          autoSpeed={autoSpeed}
+          entered={entered}
+          autoTour={autoTour}
+          anyOverlayOpen={anyOverlayOpen}
+          loopResetFlag={loopResetFlag}
+        />
         <Suspense fallback={null}>
           <GalleryRoom
             onSelectProject={setSelectedProject}
             modalOpen={anyOverlayOpen}
             targetProgress={target}
+            targetRef={targetRef}
             autoTour={autoTour && entered && !anyOverlayOpen}
             cameraDisabled={false}
             snapping={snapRef.current}
