@@ -34,7 +34,7 @@ const GZ = -1.5;
 // 13: Closing (Book)
 
 export const STOPS: GalleryStop[] = [
-  { pos: [0, 1.7, 0.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
+  { pos: [0, 1.7, 1.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
   { pos: [1.5, 1.7, -1.0],   lookAt: [5, 1.7, GZ],           label: "Main Gallery",          tier: 1 },
   // Client/creative — top wall
   { pos: [6, 1.7, GZ],       lookAt: [6, 1.7, GZ + GW],      label: "Carla's Creation",      tier: 3 },
@@ -54,7 +54,7 @@ export const STOPS: GalleryStop[] = [
   // Closing
   { pos: [16.5, 1.7, GZ],    lookAt: [19, 1.9, GZ],          label: "Professor WiggleWoo",   tier: 1 },
   // Service pedestals — last stop before loop restarts
-  { pos: [14, 3.2, GZ + 1.5], lookAt: [17.5, 0.4, GZ],        label: "Services",              tier: 2 },
+  { pos: [14, 2.8, GZ],       lookAt: [17.5, 0.5, GZ],        label: "Services",              tier: 2 },
 ];
 
 const LAST = STOPS.length - 1;

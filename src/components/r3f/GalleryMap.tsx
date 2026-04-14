@@ -52,10 +52,10 @@ export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed left-0 top-0 bottom-0 z-[75] hidden w-72 overflow-y-auto border-r border-white/[0.06] bg-[#0c0a08]/95 backdrop-blur-xl md:block"
+            className="fixed left-0 top-0 bottom-0 z-[75] hidden w-48 overflow-y-auto border-r border-white/[0.06] bg-[#0c0a08]/95 backdrop-blur-xl md:block"
           >
             {/* Header */}
-            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-[#0c0a08]/95 px-5 py-4 backdrop-blur-sm">
+            <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-[#0c0a08]/95 px-3 py-3 backdrop-blur-sm">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[9px] font-medium uppercase tracking-[0.3em] text-gallery-accent">Gallery Map</span>
@@ -79,17 +79,15 @@ export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour
                   <button
                     key={piece.index}
                     onClick={() => onSelectStop(piece.index)}
-                    className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all ${isActive ? "bg-gallery-accent/10 border border-gallery-accent/30" : "border border-transparent hover:bg-white/[0.04] hover:border-white/[0.06]"}`}
+                    className={`group flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-all ${isActive ? "bg-gallery-accent/10 border border-gallery-accent/30" : "border border-transparent hover:bg-white/[0.04] hover:border-white/[0.06]"}`}
                   >
-                    <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded bg-gallery-dark">
-                      {meta?.thumb && <Image src={meta.thumb} alt={piece.label} fill sizes="40px" className="object-cover" />}
+                    <div className="relative h-8 w-8 flex-shrink-0 overflow-hidden rounded bg-gallery-dark">
+                      {meta?.thumb && <Image src={meta.thumb} alt={piece.label} fill sizes="32px" className="object-cover" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-[11px] font-medium truncate ${isActive ? "text-gallery-accent" : "text-gallery-light group-hover:text-gallery-white"}`}>{meta?.type || ""}</p>
-                      <p className={`text-[9px] truncate ${isActive ? "text-gallery-accent/50" : "text-gallery-muted/50"}`}>{piece.label}</p>
-                      {isActive && <p className="text-[7px] uppercase tracking-wider text-gallery-accent/40 mt-0.5">Currently viewing</p>}
+                      <p className={`text-[10px] font-medium truncate ${isActive ? "text-gallery-accent" : "text-gallery-light group-hover:text-gallery-white"}`}>{meta?.type || ""}</p>
+                      {isActive && <p className="text-[7px] uppercase tracking-wider text-gallery-accent/40 mt-0.5">Viewing</p>}
                     </div>
-                    <svg className={`h-3 w-3 flex-shrink-0 transition-colors ${isActive ? "text-gallery-accent" : "text-gallery-muted/30 group-hover:text-gallery-muted"}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                   </button>
                 );
               })}
