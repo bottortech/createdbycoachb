@@ -18,6 +18,7 @@ const STOP_META: Record<string, { thumb: string; type: string }> = {
   "By Any Means":           { thumb: "/images/By-any-means-logo.png", type: "Brand Logo Design" },
   "WiggleWoo Character":    { thumb: "/images/Wiggle-Woo-Character.png", type: "Character Design" },
   "Professor WiggleWoo":    { thumb: "/images/book-cover.jpg",    type: "Children's Book" },
+  "Services":               { thumb: "/images/coachb-services.png", type: "Services & Contact" },
 };
 
 interface GalleryMapProps {
@@ -60,7 +61,7 @@ export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour
                   <span className="text-[9px] font-medium uppercase tracking-[0.3em] text-gallery-accent">Gallery Map</span>
                   <p className="mt-0.5 text-[10px] text-gallery-muted">Jump to any piece or continue the tour</p>
                 </div>
-                <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-gallery-muted transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent">
+                <button onClick={onContinueTour} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-gallery-muted transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent">
                   <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -109,7 +110,7 @@ export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour
                 Continue Tour
               </button>
               <span className="text-[8px] uppercase tracking-wider text-gallery-muted/50">Swipe to browse</span>
-              <button onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-gallery-muted">
+              <button onClick={onContinueTour} className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-gallery-muted">
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>

@@ -8,6 +8,7 @@ import { TDSLoader } from "three/examples/jsm/loaders/TDSLoader.js";
 import { Project } from "../gallery/ProjectModal";
 import WallArtwork from "./WallArtwork";
 import SpotLightWithTarget from "./SpotLightWithTarget";
+import { DiamondPedestal, EnvelopePedestal, PhonePedestal, ConnectPedestal } from  "./ServicePedestal";
 
 /* ------------------------------------------------------------------ */
 /*  STOPS — narrative order, spatial positions                         */
@@ -52,6 +53,8 @@ export const STOPS: GalleryStop[] = [
   { pos: [15.5, 1.7, GZ],    lookAt: [15.5, 1.7, GZ + GW],   label: "WiggleWoo Character",   tier: 3 },
   // Closing
   { pos: [16.5, 1.7, GZ],    lookAt: [19, 1.9, GZ],          label: "Professor WiggleWoo",   tier: 1 },
+  // Service pedestals — last stop before loop restarts
+  { pos: [15.5, 2.8, GZ + 0.8], lookAt: [17.5, 0.4, GZ],      label: "Services",              tier: 2 },
 ];
 
 const LAST = STOPS.length - 1;
@@ -174,6 +177,35 @@ function GoatStatue({ position, onClick }: { position: [number, number, number];
           <boxGeometry args={[0.8, 0.8, 0.8]} /><meshBasicMaterial transparent opacity={0.001} depthWrite={false} />
         </mesh>
       </group>
+
+      {/* Hover glow */}
+      {hovered && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.007, 0]}>
+          <circleGeometry args={[0.7, 32]} />
+          <meshBasicMaterial color="#c9a84c" transparent opacity={0.25} />
+        </mesh>
+      )}
+
+      {/* Hover label */}
+      {hovered && (
+        <Html position={[0, 1.8, 0]} center style={{ pointerEvents: "none" }}>
+          <div style={{
+            background: "rgba(12,10,8,0.9)",
+            border: "1px solid rgba(201,168,76,0.4)",
+            borderRadius: "6px",
+            padding: "6px 12px",
+            textAlign: "center",
+            whiteSpace: "nowrap",
+          }}>
+            <div style={{ color: "#c9a84c", fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>
+              The Standard
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "9px", marginTop: "2px" }}>
+              Gallery Centerpiece
+            </div>
+          </div>
+        </Html>
+      )}
 
       <mesh position={[0, 0.5, 0]} onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; }} onPointerOut={() => { setHovered(false); document.body.style.cursor = "default"; }} onClick={(e) => { e.stopPropagation(); onClick(); }}>
         <boxGeometry args={[0.9, 1.2, 0.9]} /><meshBasicMaterial transparent opacity={0.001} depthWrite={false} />
@@ -372,6 +404,12 @@ export default function GalleryRoom({
 
       {/* Goat statue — centered in the middle of the gallery corridor */}
       <GoatStatue position={[10, 0, GZ]} onClick={() => onOpenPanel?.("studio")} />
+
+      {/* Service pedestals — row across end of gallery */}
+      <ConnectPedestal position={[17.5, 0, GZ + 1.2]} onClick={() => onOpenPanel?.("connect")} />
+      <DiamondPedestal position={[17.5, 0, GZ + 0.4]} onClick={() => onOpenPanel?.("enterprise")} />
+      <EnvelopePedestal position={[17.5, 0, GZ - 0.4]} onClick={() => onOpenPanel?.("contact")} />
+      <PhonePedestal position={[17.5, 0, GZ - 1.2]} onClick={() => onOpenPanel?.("book")} />
 
       {/* Artworks */}
       {ARTWORKS.map((art) => {

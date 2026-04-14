@@ -2,7 +2,7 @@
 
 import { useRef, useMemo, useState } from "react";
 import { useLoader } from "@react-three/fiber";
-import { useTexture, Text } from "@react-three/drei";
+import { useTexture, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { TDSLoader } from "three/examples/jsm/loaders/TDSLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
@@ -14,6 +14,7 @@ interface ServicePedestalProps {
   label: string;
   sublabel: string;
   onClick: () => void;
+  noLight?: boolean;
   children: React.ReactNode; // the 3D model goes here
 }
 
@@ -21,23 +22,27 @@ interface ServicePedestalProps {
  * A reusable service pedestal — marble base with spotlight,
  * brass plaque, and an interactive 3D object on top.
  */
-function ServicePedestal({ position, label, sublabel, onClick, children }: ServicePedestalProps) {
+function ServicePedestal({ position, label, sublabel, onClick, noLight, children }: ServicePedestalProps) {
   const marbleTex = useTexture("/images/gallery/floor.png");
   const [hovered, setHovered] = useState(false);
 
   return (
     <group position={position}>
-      {/* Spotlight */}
-      <SpotLightWithTarget
-        position={[0, 3.4, 0]}
-        targetPosition={[position[0], 0.8, position[2]]}
-        intensity={30}
-        angle={0.5}
-        penumbra={0.5}
-        distance={8}
-        castShadow
-      />
-      <pointLight position={[0, 2, 0.3]} intensity={2} distance={4} color="#ffe0a0" />
+      {/* Spotlight — skip if noLight to stay within WebGL light limits */}
+      {!noLight && (
+        <>
+          <SpotLightWithTarget
+            position={[0, 3.4, 0]}
+            targetPosition={[position[0], 0.8, position[2]]}
+            intensity={30}
+            angle={0.5}
+            penumbra={0.5}
+            distance={8}
+            castShadow
+          />
+          <pointLight position={[0, 2, 0.3]} intensity={2} distance={4} color="#ffe0a0" />
+        </>
+      )}
 
       {/* Pedestal base */}
       <mesh position={[0, 0.01, 0]} castShadow receiveShadow>
@@ -59,6 +64,35 @@ function ServicePedestal({ position, label, sublabel, onClick, children }: Servi
       <group position={[0, 0.62, 0]}>
         {children}
       </group>
+
+      {/* Hover glow */}
+      {hovered && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.007, 0]}>
+          <circleGeometry args={[0.45, 32]} />
+          <meshBasicMaterial color="#c9a84c" transparent opacity={0.25} />
+        </mesh>
+      )}
+
+      {/* Hover label */}
+      {hovered && (
+        <Html position={[0, 1.3, 0]} center style={{ pointerEvents: "none" }}>
+          <div style={{
+            background: "rgba(12,10,8,0.9)",
+            border: "1px solid rgba(201,168,76,0.4)",
+            borderRadius: "6px",
+            padding: "6px 12px",
+            textAlign: "center",
+            whiteSpace: "nowrap",
+          }}>
+            <div style={{ color: "#c9a84c", fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>
+              {label}
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "9px", marginTop: "2px" }}>
+              {sublabel}
+            </div>
+          </div>
+        </Html>
+      )}
 
       {/* Click target */}
       <mesh
@@ -121,10 +155,22 @@ function ServicePedestal({ position, label, sublabel, onClick, children }: Servi
 /* ------------------------------------------------------------------ */
 
 export function DiamondPedestal({ position, onClick }: { position: [number, number, number]; onClick: () => void }) {
-  const originalModel = useLoader(TDSLoader, "/images/diamond.3ds");
+  const originalModel = useLoader(FBXLoader, "/images/uploads_files_4888333_Award+-+Glass.fbx");
 
-  const model = useMemo(() => {
+  const { model, scale } = useMemo(() => {
     const clone = originalModel.clone(true);
+
+    // Keep only the first mesh child (remove the duplicate award)
+    const meshes: THREE.Object3D[] = [];
+    clone.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) meshes.push(child);
+    });
+    // Remove all but the first mesh
+    for (let i = 1; i < meshes.length; i++) {
+      meshes[i].parent?.remove(meshes[i]);
+    }
+
+    // Apply material to remaining mesh
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         (child as THREE.Mesh).castShadow = true;
@@ -135,46 +181,51 @@ export function DiamondPedestal({ position, onClick }: { position: [number, numb
         });
       }
     });
-    return clone;
-  }, [originalModel]);
 
-  const scale = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(originalModel);
+    // Calculate bounding box for scaling and centering
+    const box = new THREE.Box3().setFromObject(clone);
+    const center = new THREE.Vector3();
     const size = new THREE.Vector3();
+    box.getCenter(center);
     box.getSize(size);
-    return 0.25 / Math.max(size.x, size.y, size.z);
+    const s = 0.45 / Math.max(size.x, size.y, size.z);
+
+    // Wrap in a container group, center within it, rotate on Y for angled display
+    const container = new THREE.Group();
+    clone.position.set(-center.x, -box.min.y, -center.z);
+    container.add(clone);
+    container.rotation.y = Math.PI / 3;
+
+    return { model: container, scale: s };
   }, [originalModel]);
 
   return (
     <ServicePedestal position={position} label="Enterprise" sublabel="Bottor Technologies" onClick={onClick}>
-      <primitive object={model} scale={scale} position={[0, 0.15, 0]} />
+      <primitive object={model} scale={scale} position={[0, 0, 0]} />
     </ServicePedestal>
   );
 }
 
 export function PhonePedestal({ position, onClick }: { position: [number, number, number]; onClick: () => void }) {
-  const gltf = useLoader(GLTFLoader, "/images/16 pro.glb");
-
-  const model = useMemo(() => {
-    const clone = gltf.scene.clone(true);
-    clone.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        (child as THREE.Mesh).castShadow = true;
-      }
-    });
-    return clone;
-  }, [gltf]);
-
-  const scale = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(gltf.scene);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    return 0.3 / Math.max(size.x, size.y, size.z);
-  }, [gltf]);
-
   return (
-    <ServicePedestal position={position} label="Book a Call" sublabel="1:1 with Coach B" onClick={onClick}>
-      <primitive object={model} scale={scale} position={[0, 0.15, 0]} rotation={[0.3, 0, 0]} />
+    <ServicePedestal position={position} label="Book a Call" sublabel="1:1 with Coach B" onClick={onClick} noLight>
+      <group rotation={[0, Math.PI / 3, 0]} position={[0, 0.12, 0]}>
+        {/* Phone body */}
+        <mesh castShadow>
+          <boxGeometry args={[0.12, 0.22, 0.012]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
+        </mesh>
+        {/* Screen bezel */}
+        <mesh position={[0, 0.005, 0.007]}>
+          <boxGeometry args={[0.1, 0.18, 0.002]} />
+          <meshStandardMaterial color="#1a1408" metalness={0.3} roughness={0.8} />
+        </mesh>
+        {/* Camera bump */}
+        <mesh position={[-0.035, 0.07, -0.009]} castShadow>
+          <boxGeometry args={[0.035, 0.04, 0.005]} />
+          <meshStandardMaterial color="#b8922e" metalness={0.9} roughness={0.1} />
+        </mesh>
+      </group>
     </ServicePedestal>
   );
 }
@@ -182,7 +233,7 @@ export function PhonePedestal({ position, onClick }: { position: [number, number
 export function EnvelopePedestal({ position, onClick }: { position: [number, number, number]; onClick: () => void }) {
   const originalModel = useLoader(FBXLoader, "/images/uploads_files_5258561_PickUpPack_Part_1_Envelope.fbx");
 
-  const model = useMemo(() => {
+  const { model, scale } = useMemo(() => {
     const clone = originalModel.clone(true);
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -194,51 +245,43 @@ export function EnvelopePedestal({ position, onClick }: { position: [number, num
         });
       }
     });
-    return clone;
-  }, [originalModel]);
 
-  const scale = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(originalModel);
+    const box = new THREE.Box3().setFromObject(clone);
+    const center = new THREE.Vector3();
     const size = new THREE.Vector3();
+    box.getCenter(center);
     box.getSize(size);
-    return 0.25 / Math.max(size.x, size.y, size.z);
+    const s = 0.45 / Math.max(size.x, size.y, size.z);
+
+    const container = new THREE.Group();
+    clone.position.set(-center.x, -box.min.y, -center.z);
+    container.add(clone);
+    container.rotation.y = Math.PI / 3;
+
+    return { model: container, scale: s };
   }, [originalModel]);
 
   return (
     <ServicePedestal position={position} label="Contact" sublabel="Start a Project" onClick={onClick}>
-      <primitive object={model} scale={scale} position={[0, 0.1, 0]} />
+      <primitive object={model} scale={scale} position={[0, 0, 0]} />
     </ServicePedestal>
   );
 }
 
-export function ChainRingPedestal({ position, onClick }: { position: [number, number, number]; onClick: () => void }) {
-  const originalModel = useLoader(FBXLoader, "/images/uploads_files_3780212_CGT_0231_right_hand_chain_ring_FB.fbx");
-
-  const model = useMemo(() => {
-    const clone = originalModel.clone(true);
-    clone.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        (child as THREE.Mesh).castShadow = true;
-        (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-          color: "#c9a84c",
-          metalness: 0.85,
-          roughness: 0.15,
-        });
-      }
-    });
-    return clone;
-  }, [originalModel]);
-
-  const scale = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(originalModel);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    return 0.25 / Math.max(size.x, size.y, size.z);
-  }, [originalModel]);
-
+export function ConnectPedestal({ position, onClick }: { position: [number, number, number]; onClick: () => void }) {
   return (
-    <ServicePedestal position={position} label="Connect" sublabel="Stay Connected" onClick={onClick}>
-      <primitive object={model} scale={scale} position={[0, 0.15, 0]} />
+    <ServicePedestal position={position} label="Connect" sublabel="Stay Connected" onClick={onClick} noLight>
+      <group rotation={[0, Math.PI / 3, 0]} position={[0, 0.1, 0]}>
+        {/* Chain link — two interlocked tori */}
+        <mesh castShadow position={[-0.04, 0, 0]} rotation={[0, 0, Math.PI / 6]}>
+          <torusGeometry args={[0.07, 0.015, 16, 32]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
+        </mesh>
+        <mesh castShadow position={[0.04, 0, 0]} rotation={[0, Math.PI / 2, Math.PI / 6]}>
+          <torusGeometry args={[0.07, 0.015, 16, 32]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
+        </mesh>
+      </group>
     </ServicePedestal>
   );
 }
