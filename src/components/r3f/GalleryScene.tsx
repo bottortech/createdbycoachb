@@ -122,7 +122,6 @@ export default function GalleryScene() {
 
   // Handle map piece selection
   const handleMapSelect = useCallback((stopIndex: number) => {
-    setMapOpen(false);
     setMode("manual");
     updateTarget(stopIndex);
     snapRef.current = true;
