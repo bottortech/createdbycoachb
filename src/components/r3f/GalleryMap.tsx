@@ -1,0 +1,138 @@
+"use client";
+
+import Image from "next/image";
+import { AnimatePresence, motion } from "framer-motion";
+import { STOPS } from "./GalleryRoom";
+
+const STOP_META: Record<string, { thumb: string; type: string }> = {
+  "WiggleWoo's Word Quest": { thumb: "/images/ipad-game-view.png", type: "Educational Game / Web App" },
+  "The Standard":           { thumb: "/images/goat-statue.png",    type: "Gallery Centerpiece" },
+  "Carla's Creation":       { thumb: "/images/carlas-creation.png", type: "Flyer Design" },
+  "JB TV":                  { thumb: "/images/jb-tv.png",          type: "Brand Logo / Visual Identity" },
+  "Lush Brows":             { thumb: "/images/lush-brows-logo.png", type: "Logo Design" },
+  "RetroRack":              { thumb: "/images/retrorack-web-app.png", type: "Inventory Management Web App" },
+  "RetroRack Logo":         { thumb: "/images/retro-rack-logo.png", type: "Brand Logo Design" },
+  "RetroRack Extension":    { thumb: "/images/retrorack-extension.jpg", type: "Chrome Extension / Cross Listing Tool" },
+  "Bottor Assist":          { thumb: "/images/bottor-assist.png",  type: "AI Tool / Web App" },
+  "By Any Means":           { thumb: "/images/By-any-means-logo.png", type: "Brand Logo Design" },
+  "WiggleWoo Character":    { thumb: "/images/Wiggle-Woo-Character.png", type: "Character Design" },
+  "Professor WiggleWoo":    { thumb: "/images/book-cover.jpg",    type: "Children's Book" },
+};
+
+interface GalleryMapProps {
+  open: boolean;
+  onClose: () => void;
+  onSelectStop: (index: number) => void;
+  onContinueTour: () => void;
+  currentLabel: string;
+}
+
+export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour, currentLabel }: GalleryMapProps) {
+  const pieces = STOPS.map((stop, i) => ({ ...stop, index: i })).filter(
+    (s) => s.label !== "Main Gallery"
+  );
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ x: "-100%" }}
+          animate={{ x: 0 }}
+          exit={{ x: "-100%" }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          className="fixed left-0 top-0 bottom-0 z-[75] w-72 overflow-y-auto border-r border-white/[0.06] bg-[#0c0a08]/95 backdrop-blur-xl"
+        >
+          {/* Header */}
+          <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-[#0c0a08]/95 px-5 py-4 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[9px] font-medium uppercase tracking-[0.3em] text-gallery-accent">
+                  Gallery Map
+                </span>
+                <p className="mt-0.5 text-[10px] text-gallery-muted">
+                  Jump to any piece or continue the tour
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-gallery-muted transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+              >
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Continue Auto Tour button */}
+            <button
+              onClick={onContinueTour}
+              className="mt-3 w-full rounded-lg bg-gallery-accent py-2.5 text-[10px] font-medium uppercase tracking-wider text-gallery-black transition-all hover:bg-gallery-accent/90"
+            >
+              Continue Auto Tour
+            </button>
+          </div>
+
+          {/* Piece list */}
+          <div className="p-3 space-y-1">
+            {pieces.map((piece) => {
+              const meta = STOP_META[piece.label];
+              const isActive = currentLabel === piece.label;
+
+              return (
+                <button
+                  key={piece.index}
+                  onClick={() => onSelectStop(piece.index)}
+                  className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all ${
+                    isActive
+                      ? "bg-gallery-accent/10 border border-gallery-accent/30"
+                      : "border border-transparent hover:bg-white/[0.04] hover:border-white/[0.06]"
+                  }`}
+                >
+                  <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded bg-gallery-dark">
+                    {meta?.thumb ? (
+                      <Image
+                        src={meta.thumb}
+                        alt={piece.label}
+                        fill
+                        sizes="40px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[8px] text-gallery-muted">
+                        —
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-[11px] font-medium truncate ${
+                      isActive ? "text-gallery-accent" : "text-gallery-light group-hover:text-gallery-white"
+                    }`}>
+                      {meta?.type || ""}
+                    </p>
+                    <p className={`text-[9px] truncate ${
+                      isActive ? "text-gallery-accent/50" : "text-gallery-muted/50"
+                    }`}>
+                      {piece.label}
+                    </p>
+                    {isActive && (
+                      <p className="text-[7px] uppercase tracking-wider text-gallery-accent/40 mt-0.5">
+                        Currently viewing
+                      </p>
+                    )}
+                  </div>
+
+                  <svg className={`h-3 w-3 flex-shrink-0 transition-colors ${
+                    isActive ? "text-gallery-accent" : "text-gallery-muted/30 group-hover:text-gallery-muted"
+                  }`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

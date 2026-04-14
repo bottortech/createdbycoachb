@@ -1,58 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { SCENES } from "./gallery/GalleryApp";
 
-const navItems = [
-  { id: "entrance", label: "Entrance" },
-  { id: "featured-exhibit", label: "Featured Exhibit" },
-  { id: "product-wing", label: "Product Wing" },
-  { id: "creative-gallery", label: "Creative Gallery" },
-  { id: "author-exhibit", label: "Author Exhibit" },
-  { id: "government-enterprise", label: "Government & Enterprise" },
-  { id: "studio", label: "Studio" },
-  { id: "book-a-call", label: "Book a Call" },
-  { id: "commission-desk", label: "Commission Desk" },
-  { id: "social-wall", label: "Social Wall" },
-];
+interface GalleryNavProps {
+  currentScene: number;
+  onSceneChange: (index: number) => void;
+}
 
-export default function GalleryNav() {
+export default function GalleryNav({
+  currentScene,
+  onSceneChange,
+}: GalleryNavProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [activeSection, setActiveSection] = useState("entrance");
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-
-      const sections = navItems.map((item) => ({
-        id: item.id,
-        el: document.getElementById(item.id),
-      }));
-
-      for (let i = sections.length - 1; i >= 0; i--) {
-        const section = sections[i];
-        if (section.el) {
-          const rect = section.el.getBoundingClientRect();
-          if (rect.top <= 200) {
-            setActiveSection(section.id);
-            break;
-          }
-        }
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  const scrollTo = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
-      setIsOpen(false);
-    }
-  };
 
   return (
     <>
@@ -60,16 +21,12 @@ export default function GalleryNav() {
       <motion.nav
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.5 }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          scrolled
-            ? "bg-gallery-black/80 backdrop-blur-xl border-b border-white/5"
-            : "bg-transparent"
-        }`}
+        transition={{ duration: 0.6, delay: 0.3 }}
+        className="fixed top-0 left-0 right-0 z-40 bg-gallery-black/60 backdrop-blur-xl border-b border-white/5"
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 md:px-12">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3 md:px-12">
           <button
-            onClick={() => scrollTo("entrance")}
+            onClick={() => onSceneChange(0)}
             className="text-lg font-light tracking-widest text-gallery-white hover:text-gallery-accent transition-colors"
           >
             COACH B
@@ -77,17 +34,17 @@ export default function GalleryNav() {
 
           {/* Desktop links */}
           <div className="hidden items-center gap-1 lg:flex">
-            {navItems.slice(1, 9).map((item) => (
+            {SCENES.slice(1).map((scene, i) => (
               <button
-                key={item.id}
-                onClick={() => scrollTo(item.id)}
+                key={scene.id}
+                onClick={() => onSceneChange(i + 1)}
                 className={`rounded-full px-3 py-1.5 text-xs tracking-wide transition-all duration-300 ${
-                  activeSection === item.id
+                  currentScene === i + 1
                     ? "text-gallery-accent bg-gallery-accent-soft"
                     : "text-gallery-muted hover:text-gallery-white"
                 }`}
               >
-                {item.label}
+                {scene.label}
               </button>
             ))}
           </div>
@@ -122,24 +79,27 @@ export default function GalleryNav() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-40 bg-gallery-black/95 backdrop-blur-xl lg:hidden"
+            className="fixed inset-0 z-50 bg-gallery-black/95 backdrop-blur-xl lg:hidden"
           >
             <div className="flex h-full flex-col items-center justify-center gap-2">
-              {navItems.map((item, i) => (
+              {SCENES.map((scene, i) => (
                 <motion.button
-                  key={item.id}
+                  key={scene.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  transition={{ delay: i * 0.05 }}
-                  onClick={() => scrollTo(item.id)}
+                  transition={{ delay: i * 0.04 }}
+                  onClick={() => {
+                    onSceneChange(i);
+                    setIsOpen(false);
+                  }}
                   className={`px-6 py-3 text-lg tracking-wide transition-colors ${
-                    activeSection === item.id
+                    currentScene === i
                       ? "text-gallery-accent"
                       : "text-gallery-muted hover:text-gallery-white"
                   }`}
                 >
-                  {item.label}
+                  {scene.label}
                 </motion.button>
               ))}
             </div>
