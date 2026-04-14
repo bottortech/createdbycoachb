@@ -154,9 +154,9 @@ export default function GalleryScene() {
       let holdTimer = 0;
       let phase: "drift" | "pause" = "pause"; // start paused at stop 0
 
-      const HOLD_TIER: Record<number, number> = { 1: 80, 2: 60, 3: 50 };
-      const SETTLE_HERO = 60;
-      const SETTLE_STD = 30;
+      const HOLD_TIER: Record<number, number> = { 1: 35, 2: 40, 3: 30 };
+      const SETTLE_HERO = 20;
+      const SETTLE_STD = 20;
 
       // Start at stop 0
       updateTarget(0);
@@ -179,10 +179,11 @@ export default function GalleryScene() {
           snapRef.current = true;
 
           const tier = STOPS[stopIdx]?.tier || 3;
+          const isFirst = stopIdx === 0;
           const isHero = stopIdx <= 2 || tier === 1;
           const isGoat = STOPS[stopIdx]?.label === "The Standard";
-          const settleTime = isGoat ? 100 : (isHero ? SETTLE_HERO : SETTLE_STD); // goat gets 5s settle
-          const holdDuration = isGoat ? 100 : (HOLD_TIER[tier] || 50); // goat gets 5s hold
+          const settleTime = isFirst ? 15 : isGoat ? 50 : (isHero ? SETTLE_HERO : SETTLE_STD);
+          const holdDuration = isFirst ? 20 : isGoat ? 50 : (HOLD_TIER[tier] || 50);
 
           if (holdTimer >= settleTime + holdDuration) {
             // Done with this stop — move to next
