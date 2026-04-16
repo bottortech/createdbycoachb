@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useTexture, Text } from "@react-three/drei";
+import { useTexture, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { Project } from "../gallery/ProjectModal";
 import GalleryLight from "./GalleryLight";
@@ -92,6 +92,10 @@ export default function WallArtwork({
   const plaqueW = Math.max(width * 0.55, 0.35);
   const plaqueH = 0.08;
 
+  // Glow dimensions match the frame shape
+  const glowW = hasFrameTexture ? frameW : width;
+  const glowH = hasFrameTexture ? frameH : height;
+
   return (
     <group position={position} rotation={rotation}>
       <group
@@ -178,12 +182,38 @@ export default function WallArtwork({
         )}
       </group>
 
-      {/* Hover glow — golden backlight behind the frame */}
+      {/* Hover glow — frame-shaped golden outline matching the piece */}
       {hovered && (
-        <mesh position={[0, 0, -0.01]}>
-          <planeGeometry args={[(hasFrameTexture ? frameW : width) + 0.12, (hasFrameTexture ? frameH : height) + 0.12]} />
-          <meshBasicMaterial color="#c9a84c" transparent opacity={0.15} />
-        </mesh>
+        <>
+          {/* Outer glow plane */}
+          <mesh position={[0, 0, -0.008]}>
+            <planeGeometry args={[glowW + 0.06, glowH + 0.06]} />
+            <meshBasicMaterial color="#c9a84c" transparent opacity={0.12} />
+          </mesh>
+          {/* Inner cutout (dark) to create border effect */}
+          <mesh position={[0, 0, -0.006]}>
+            <planeGeometry args={[glowW - 0.02, glowH - 0.02]} />
+            <meshBasicMaterial color="#050403" transparent opacity={0.9} />
+          </mesh>
+          {/* Hover label */}
+          <Html position={[0, (glowH / 2) + 0.15, 0.01]} center style={{ pointerEvents: "none" }}>
+            <div style={{
+              background: "rgba(12,10,8,0.9)",
+              border: "1px solid rgba(201,168,76,0.4)",
+              borderRadius: "6px",
+              padding: "6px 12px",
+              textAlign: "center",
+              whiteSpace: "nowrap",
+            }}>
+              <div style={{ color: "#c9a84c", fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>
+                {project.title}
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "9px", marginTop: "2px" }}>
+                {WORK_TYPE[project.title] || project.category}
+              </div>
+            </div>
+          </Html>
+        </>
       )}
 
       {/* Plaque — positioned below the frame's visual bottom */}
