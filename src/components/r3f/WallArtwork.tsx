@@ -178,6 +178,14 @@ export default function WallArtwork({
         )}
       </group>
 
+      {/* Hover glow — golden backlight behind the frame */}
+      {hovered && (
+        <mesh position={[0, 0, -0.01]}>
+          <planeGeometry args={[(hasFrameTexture ? frameW : width) + 0.12, (hasFrameTexture ? frameH : height) + 0.12]} />
+          <meshBasicMaterial color="#c9a84c" transparent opacity={0.15} />
+        </mesh>
+      )}
+
       {/* Plaque — positioned below the frame's visual bottom */}
       <group position={[0, -(hasFrameTexture ? (frameType === "square" ? frameH / 2 - 0.12 : frameH / 2) : height / 2) - 0.08, 0.005]}>
         {/* Brass plaque — 3D geometry with metallic gold finish */}

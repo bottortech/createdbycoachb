@@ -45,14 +45,15 @@ function TourController({
       return;
     }
 
-    // Just became active — reset tour
+    // Just became active — resume from current position
     if (!wasActive.current) {
       wasActive.current = true;
-      stopIdx.current = 0;
+      const current = targetRef.current;
+      stopIdx.current = Math.min(Math.round(current), LAST);
       holdTime.current = 0;
       phase.current = "pause";
-      targetRef.current = 0;
-      syncTarget(0);
+      targetRef.current = stopIdx.current;
+      syncTarget(stopIdx.current);
       return;
     }
 
@@ -474,7 +475,7 @@ export default function GalleryScene() {
         open={mapOpen}
         onClose={() => setMapOpen(false)}
         onSelectStop={handleMapSelect}
-        onContinueTour={() => { setMapOpen(false); setMode("guided"); }}
+        onContinueTour={() => { setMode("guided"); }}
         currentLabel={currentLabel}
       />
 
