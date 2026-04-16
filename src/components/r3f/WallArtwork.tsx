@@ -130,19 +130,19 @@ export default function WallArtwork({
             </mesh>
 
             {/* Frame sides */}
-            <mesh position={[0, height / 2 - frameBorder / 2, D / 2 + 0.0025]} castShadow>
+            <mesh position={[0, height / 2 - frameBorder / 2, D / 2 + 0.0025]}>
               <boxGeometry args={[width, frameBorder, D]} />
               <meshStandardMaterial color="#2a1d10" metalness={0.3} roughness={0.65} />
             </mesh>
-            <mesh position={[0, -height / 2 + frameBorder / 2, D / 2 + 0.0025]} castShadow>
+            <mesh position={[0, -height / 2 + frameBorder / 2, D / 2 + 0.0025]}>
               <boxGeometry args={[width, frameBorder, D]} />
               <meshStandardMaterial color="#2a1d10" metalness={0.3} roughness={0.65} />
             </mesh>
-            <mesh position={[-width / 2 + frameBorder / 2, 0, D / 2 + 0.0025]} castShadow>
+            <mesh position={[-width / 2 + frameBorder / 2, 0, D / 2 + 0.0025]}>
               <boxGeometry args={[frameBorder, height, D]} />
               <meshStandardMaterial color="#2a1d10" metalness={0.3} roughness={0.65} />
             </mesh>
-            <mesh position={[width / 2 - frameBorder / 2, 0, D / 2 + 0.0025]} castShadow>
+            <mesh position={[width / 2 - frameBorder / 2, 0, D / 2 + 0.0025]}>
               <boxGeometry args={[frameBorder, height, D]} />
               <meshStandardMaterial color="#2a1d10" metalness={0.3} roughness={0.65} />
             </mesh>

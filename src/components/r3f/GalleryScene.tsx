@@ -364,8 +364,9 @@ export default function GalleryScene() {
     <div className="fixed inset-0">
       <Canvas
         shadows
-        camera={{ fov: 55, near: 0.1, far: 200, position: [0, 1.7, 1.5] }}
-        gl={{ antialias: true, alpha: false, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.8 }}
+        dpr={[1, 1.5]}
+        camera={{ fov: 55, near: 0.1, far: 30, position: [0, 1.7, 1.5] }}
+        gl={{ antialias: false, alpha: false, powerPreference: "default", toneMapping: THREE.LinearToneMapping, toneMappingExposure: 1.6 }}
         style={{ background: "#050403" }}
       >
         <TourController

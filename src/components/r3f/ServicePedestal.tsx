@@ -23,7 +23,7 @@ interface ServicePedestalProps {
  * brass plaque, and an interactive 3D object on top.
  */
 function ServicePedestal({ position, label, sublabel, onClick, noLight, children }: ServicePedestalProps) {
-  const marbleTex = useTexture("/images/gallery/floor.png");
+  const marbleTex = useTexture("/images/gallery/floor.jpg");
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -38,24 +38,24 @@ function ServicePedestal({ position, label, sublabel, onClick, noLight, children
             angle={0.5}
             penumbra={0.5}
             distance={8}
-            castShadow
+            castShadow={false}
           />
           <pointLight position={[0, 2, 0.3]} intensity={2} distance={4} color="#ffe0a0" />
         </>
       )}
 
       {/* Pedestal base */}
-      <mesh position={[0, 0.01, 0]} castShadow receiveShadow>
+      <mesh position={[0, 0.01, 0]} receiveShadow>
         <boxGeometry args={[0.7, 0.02, 0.7]} />
         <meshStandardMaterial map={marbleTex} color="#908478" metalness={0.35} roughness={0.6} />
       </mesh>
       {/* Pedestal body */}
-      <mesh position={[0, 0.3, 0]} castShadow receiveShadow>
+      <mesh position={[0, 0.3, 0]} receiveShadow>
         <boxGeometry args={[0.55, 0.6, 0.55]} />
         <meshStandardMaterial map={marbleTex} color="#908478" metalness={0.35} roughness={0.6} />
       </mesh>
       {/* Pedestal cap */}
-      <mesh position={[0, 0.61, 0]} castShadow>
+      <mesh position={[0, 0.61, 0]}>
         <boxGeometry args={[0.62, 0.02, 0.62]} />
         <meshStandardMaterial map={marbleTex} color="#a09488" metalness={0.4} roughness={0.5} />
       </mesh>
@@ -173,7 +173,7 @@ export function DiamondPedestal({ position, onClick }: { position: [number, numb
     // Apply material to remaining mesh
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        (child as THREE.Mesh).castShadow = true;
+        (child as THREE.Mesh).castShadow = false;
         (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
           color: "#c9a84c",
           metalness: 0.9,
@@ -211,7 +211,7 @@ export function PhonePedestal({ position, onClick }: { position: [number, number
     <ServicePedestal position={position} label="Book a Call" sublabel="1:1 with Coach B" onClick={onClick} noLight>
       <group rotation={[0, Math.PI / 3, 0]} position={[0, 0.12, 0]}>
         {/* Phone body */}
-        <mesh castShadow>
+        <mesh>
           <boxGeometry args={[0.12, 0.22, 0.012]} />
           <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
         </mesh>
@@ -221,7 +221,7 @@ export function PhonePedestal({ position, onClick }: { position: [number, number
           <meshStandardMaterial color="#1a1408" metalness={0.3} roughness={0.8} />
         </mesh>
         {/* Camera bump */}
-        <mesh position={[-0.035, 0.07, -0.009]} castShadow>
+        <mesh position={[-0.035, 0.07, -0.009]}>
           <boxGeometry args={[0.035, 0.04, 0.005]} />
           <meshStandardMaterial color="#b8922e" metalness={0.9} roughness={0.1} />
         </mesh>
@@ -237,7 +237,7 @@ export function EnvelopePedestal({ position, onClick }: { position: [number, num
     const clone = originalModel.clone(true);
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        (child as THREE.Mesh).castShadow = true;
+        (child as THREE.Mesh).castShadow = false;
         (child as THREE.Mesh).material = new THREE.MeshStandardMaterial({
           color: "#c9a84c",
           metalness: 0.8,
@@ -273,11 +273,11 @@ export function ConnectPedestal({ position, onClick }: { position: [number, numb
     <ServicePedestal position={position} label="Connect" sublabel="Stay Connected" onClick={onClick} noLight>
       <group rotation={[0, Math.PI / 3, 0]} position={[0, 0.1, 0]}>
         {/* Chain link — two interlocked tori */}
-        <mesh castShadow position={[-0.04, 0, 0]} rotation={[0, 0, Math.PI / 6]}>
+        <mesh position={[-0.04, 0, 0]} rotation={[0, 0, Math.PI / 6]}>
           <torusGeometry args={[0.07, 0.015, 16, 32]} />
           <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
         </mesh>
-        <mesh castShadow position={[0.04, 0, 0]} rotation={[0, Math.PI / 2, Math.PI / 6]}>
+        <mesh position={[0.04, 0, 0]} rotation={[0, Math.PI / 2, Math.PI / 6]}>
           <torusGeometry args={[0.07, 0.015, 16, 32]} />
           <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
         </mesh>

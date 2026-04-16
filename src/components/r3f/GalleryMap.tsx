@@ -6,16 +6,16 @@ import { AnimatePresence, motion } from "framer-motion";
 import { STOPS } from "./GalleryRoom";
 
 const STOP_META: Record<string, { thumb: string; type: string }> = {
-  "WiggleWoo's Word Quest": { thumb: "/images/ipad-game-view.png", type: "Educational Game / Web App" },
+  "WiggleWoo's Word Quest": { thumb: "/images/ipad-game-view.jpg", type: "Educational Game / Web App" },
   "The Standard":           { thumb: "/images/goat-statue.png",    type: "Gallery Centerpiece" },
-  "Carla's Creation":       { thumb: "/images/carlas-creation.png", type: "Flyer Design" },
-  "JB TV":                  { thumb: "/images/jb-tv.png",          type: "Brand Logo / Visual Identity" },
+  "Carla's Creation":       { thumb: "/images/carlas-creation.jpg", type: "Flyer Design" },
+  "JB TV":                  { thumb: "/images/jb-tv.jpg",          type: "Brand Logo / Visual Identity" },
   "Lush Brows":             { thumb: "/images/lush-brows-logo.png", type: "Logo Design" },
-  "RetroRack":              { thumb: "/images/retrorack-web-app.png", type: "Inventory Management Web App" },
-  "RetroRack Logo":         { thumb: "/images/retro-rack-logo.png", type: "Brand Logo Design" },
+  "RetroRack":              { thumb: "/images/retrorack-web-app.jpg", type: "Inventory Management Web App" },
+  "RetroRack Logo":         { thumb: "/images/retro-rack-logo.jpg", type: "Brand Logo Design" },
   "RetroRack Extension":    { thumb: "/images/retrorack-extension.jpg", type: "Chrome Extension / Cross Listing Tool" },
-  "Bottor Assist":          { thumb: "/images/bottor-assist.png",  type: "AI Tool / Web App" },
-  "By Any Means":           { thumb: "/images/By-any-means-logo.png", type: "Brand Logo Design" },
+  "Bottor Assist":          { thumb: "/images/bottor-assist.jpg",  type: "AI Tool / Web App" },
+  "By Any Means":           { thumb: "/images/By-any-means-logo.jpg", type: "Brand Logo Design" },
   "WiggleWoo Character":    { thumb: "/images/Wiggle-Woo-Character.png", type: "Character Design" },
   "Professor WiggleWoo":    { thumb: "/images/book-cover.jpg",    type: "Children's Book" },
   "Services":               { thumb: "/images/coachb-services.png", type: "Services & Contact" },
