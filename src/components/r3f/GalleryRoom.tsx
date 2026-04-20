@@ -491,10 +491,12 @@ export default function GalleryRoom({
       smoothLook.current = target;
     }
 
-    // Frame-rate independent exponential lerp
+    // Frame-rate independent exponential lerp. Clamp dt so a brief frame
+    // hitch doesn't cause a big catch-up jump that reads as "chop".
+    const dtClamped = Math.min(dt, 0.05);
     const atStop = Math.abs(target - Math.round(target)) < 0.02;
-    const posRate = snapping ? 8 : (atStop ? 8 : 25);
-    const posLerp = 1 - Math.exp(-posRate * dt);
+    const posRate = snapping ? 8 : (atStop ? 8 : 12);
+    const posLerp = 1 - Math.exp(-posRate * dtClamped);
     smoothProgress.current += (target - smoothProgress.current) * posLerp;
     if (Math.abs(smoothProgress.current - target) < 0.005) {
       smoothProgress.current = target;
@@ -502,8 +504,8 @@ export default function GalleryRoom({
     }
 
     // Look lerp — slightly faster than position for natural look-ahead
-    const lookRate = snapping ? 10 : (atStop ? 10 : 30);
-    const lookLerp = 1 - Math.exp(-lookRate * dt);
+    const lookRate = snapping ? 10 : (atStop ? 10 : 16);
+    const lookLerp = 1 - Math.exp(-lookRate * dtClamped);
     smoothLook.current += (target - smoothLook.current) * lookLerp;
     if (Math.abs(smoothLook.current - target) < 0.005) smoothLook.current = target;
 

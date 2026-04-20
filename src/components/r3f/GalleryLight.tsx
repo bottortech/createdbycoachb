@@ -41,7 +41,7 @@ export default function GalleryLight({ isActive, width }: GalleryLightProps) {
             metalness={0.8}
             roughness={0.2}
             emissive="#ffd080"
-            emissiveIntensity={isActive ? 1.5 : 0.04}
+            emissiveIntensity={isActive ? 2.5 : 0.08}
             toneMapped={false}
           />
         </mesh>

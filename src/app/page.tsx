@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import FeedbackToast from "@/components/FeedbackToast";
 
 // Dynamic import with SSR disabled — Three.js needs the browser
 const GalleryScene = dynamic(
@@ -9,5 +10,10 @@ const GalleryScene = dynamic(
 );
 
 export default function Home() {
-  return <GalleryScene />;
+  return (
+    <>
+      <GalleryScene />
+      <FeedbackToast />
+    </>
+  );
 }

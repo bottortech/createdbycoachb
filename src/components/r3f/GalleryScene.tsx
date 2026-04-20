@@ -85,8 +85,8 @@ function TourController({
       const isGoat = STOPS[stopIdx.current]?.label === "The Standard";
       const isServices = STOPS[stopIdx.current]?.label === "Services";
 
-      const settleTime = isFirst ? 0.4 : isServices ? 0.75 : isGoat ? 2.5 : 1.0;
-      const holdDuration = isFirst ? 2.6 : isServices ? 2.0 : isGoat ? 2.5
+      const settleTime = isFirst ? 0.15 : isServices ? 0.75 : isGoat ? 2.5 : 1.0;
+      const holdDuration = isFirst ? 0.8 : isServices ? 2.0 : isGoat ? 2.5
         : (tier === 1 ? 1.75 : tier === 2 ? 2.0 : 1.5);
 
       if (holdTime.current >= settleTime + holdDuration) {
@@ -527,7 +527,7 @@ export default function GalleryScene() {
       {/* Intro */}
       <AnimatePresence>
         {!entered && (
-          <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.5 }} className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#050403]">
+          <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#050403]">
             <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.2, delay: 0.3 }} className="mb-4 text-[10px] font-medium uppercase tracking-[0.5em] text-gallery-accent/80">Welcome to the Gallery</motion.span>
             <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.2, delay: 0.8 }} className="text-center text-4xl font-extralight text-gallery-white md:text-6xl lg:text-7xl">Created by <span className="text-gallery-accent">Coach B</span></motion.h1>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 1.8 }} className="mt-4 text-sm text-gallery-muted">Builder. Designer. Founder. Author.</motion.p>
