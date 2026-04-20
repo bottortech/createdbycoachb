@@ -31,8 +31,10 @@ interface GalleryMapProps {
 
 export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour, currentLabel }: GalleryMapProps) {
   const pieces = STOPS.map((stop, i) => ({ ...stop, index: i })).filter(
-    (s) => s.label !== "Main Gallery"
+    (s) => s.label !== "Main Gallery" && s.label !== "" && !s.label.startsWith("__")
   );
+  const mainGalleryIdx = STOPS.findIndex((s) => s.label === "Main Gallery");
+  const isAtMainGallery = currentLabel === "Main Gallery";
 
   // Scroll active thumbnail into view on mobile strip
   const stripRef = useRef<HTMLDivElement>(null);
@@ -68,6 +70,21 @@ export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour
               <button onClick={onContinueTour} className="mt-3 w-full rounded-lg bg-gallery-accent py-2.5 text-[10px] font-medium uppercase tracking-wider text-gallery-black transition-all hover:bg-gallery-accent/90">
                 Continue Auto Tour
               </button>
+              {mainGalleryIdx >= 0 && (
+                <button
+                  onClick={() => onSelectStop(mainGalleryIdx)}
+                  className={`mt-2 flex w-full items-center justify-center gap-2 rounded-lg border py-2 text-[10px] font-medium uppercase tracking-wider transition-all ${
+                    isAtMainGallery
+                      ? "border-gallery-accent/60 bg-gallery-accent/10 text-gallery-accent"
+                      : "border-white/10 bg-white/[0.03] text-gallery-light hover:border-gallery-accent/40 hover:text-gallery-accent"
+                  }`}
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  Main Gallery View
+                </button>
+              )}
             </div>
 
             {/* Piece list */}
@@ -102,12 +119,23 @@ export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="fixed left-0 right-0 bottom-0 z-[75] md:hidden"
           >
-            {/* Continue button + close */}
-            <div className="flex items-center justify-between bg-[#0c0a08]/95 px-3 py-2 backdrop-blur-xl border-t border-white/[0.06]">
-              <button onClick={onContinueTour} className="rounded-full bg-gallery-accent px-4 py-1.5 text-[9px] font-medium uppercase tracking-wider text-gallery-black">
+            {/* Continue button + Main Gallery + close */}
+            <div className="flex items-center justify-between gap-2 bg-[#0c0a08]/95 px-3 py-2 backdrop-blur-xl border-t border-white/[0.06]">
+              <button onClick={onContinueTour} className="rounded-full bg-gallery-accent px-3 py-1.5 text-[9px] font-medium uppercase tracking-wider text-gallery-black">
                 Continue Tour
               </button>
-              <span className="text-[8px] uppercase tracking-wider text-gallery-muted/50">Swipe to browse</span>
+              {mainGalleryIdx >= 0 && (
+                <button
+                  onClick={() => onSelectStop(mainGalleryIdx)}
+                  className={`rounded-full border px-3 py-1.5 text-[9px] font-medium uppercase tracking-wider transition-colors ${
+                    isAtMainGallery
+                      ? "border-gallery-accent/60 bg-gallery-accent/10 text-gallery-accent"
+                      : "border-white/15 text-gallery-light"
+                  }`}
+                >
+                  Main Gallery
+                </button>
+              )}
               <button onClick={onContinueTour} className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-gallery-muted">
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>

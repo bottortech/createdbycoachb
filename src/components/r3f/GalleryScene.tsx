@@ -2,17 +2,21 @@
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import GalleryRoom, { STOPS } from "./GalleryRoom";
+import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
 import ProjectModal, { Project } from "../gallery/ProjectModal";
 import GalleryOverlayPanel from "./GalleryOverlayPanel";
 import GalleryMap from "./GalleryMap";
+import TechVaultMap from "./TechVaultMap";
 
 type PanelType = "enterprise" | "studio" | "appointments" | "commission" | "connect" | null;
 
-const LAST = STOPS.length - 1;
+// Max stop user can reach via scroll/arrows. Vault case stops live past PORTAL_STOP
+// but are only addressable via the TechVaultMap, not by scrolling.
+const LAST = PORTAL_STOP;
 const DEFAULT_SPEED = 0.5;
+const PORTAL_ANIM_MS = 1500;
 
 /* ------------------------------------------------------------------ */
 /*  TourController — frame-synced auto-tour with delta-time drift      */
@@ -45,11 +49,11 @@ function TourController({
       return;
     }
 
-    // Just became active — resume from current position
+    // Just became active — resume from current position (but never past the tour's last stop)
     if (!wasActive.current) {
       wasActive.current = true;
       const current = targetRef.current;
-      stopIdx.current = Math.min(Math.round(current), LAST);
+      stopIdx.current = Math.min(Math.round(current), TOUR_LAST);
       holdTime.current = 0;
       phase.current = "pause";
       targetRef.current = stopIdx.current;
@@ -72,7 +76,7 @@ function TourController({
 
     if (phase.current === "pause") {
       holdTime.current += dt;
-      targetRef.current = Math.max(0, Math.min(LAST, stopIdx.current));
+      targetRef.current = Math.max(0, Math.min(TOUR_LAST, stopIdx.current));
       snapRef.current = true;
 
       // Hold timing (seconds) — matches original 50ms-tick pacing exactly
@@ -90,11 +94,11 @@ function TourController({
         snapRef.current = false;
         stopIdx.current++;
 
-        if (stopIdx.current > LAST) {
-          stopIdx.current = LAST;
+        if (stopIdx.current > TOUR_LAST) {
+          stopIdx.current = TOUR_LAST;
           phase.current = "pause";
-        } else if (stopIdx.current === LAST) {
-          targetRef.current = LAST;
+        } else if (stopIdx.current === TOUR_LAST) {
+          targetRef.current = TOUR_LAST;
           phase.current = "pause";
         } else {
           phase.current = "drift";
@@ -141,22 +145,30 @@ export default function GalleryScene() {
   const [currentLabel, setCurrentLabel] = useState("Entrance");
   const [autoSpeed, setAutoSpeed] = useState(DEFAULT_SPEED);
   const [mapOpen, setMapOpen] = useState(false);
+  const [portalStage, setPortalStage] = useState<"none" | "entering" | "inside" | "exiting">("none");
+  const [portalReady, setPortalReady] = useState(false);
   const mapAutoShown = useRef(false);
   const loopResetFlag = useRef(false);
 
   const autoTour = mode === "guided";
   const setAutoTour = useCallback((v: boolean) => setMode(v ? "guided" : "manual"), []);
+  const portalActive = portalStage !== "none";
 
   // The target progress (0 to LAST). Camera smoothly follows this.
   const targetRef = useRef(0);
   const [target, setTarget] = useState(0);
   const scrollAccum = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const portalAudioRef = useRef<HTMLAudioElement | null>(null);
+  const portalReturnStop = useRef<number>(PORTAL_STOP);
+  const snapRef = useRef(false);
   const anyOverlayOpen = !!selectedProject || !!activePanel;
 
-  // Sync ref with state (ref for non-render reads, state for passing to Canvas)
+  // Sync ref with state (ref for non-render reads, state for passing to Canvas).
+  // Clamp to the full STOPS range so the map can directly address hidden stops
+  // (vault cases, portal approach). LAST is reserved for scroll-input ranges.
   const updateTarget = useCallback((v: number) => {
-    const clamped = Math.max(0, Math.min(LAST, v));
+    const clamped = Math.max(0, Math.min(STOPS.length - 1, v));
     targetRef.current = clamped;
     setTarget(clamped);
   }, []);
@@ -166,7 +178,13 @@ export default function GalleryScene() {
     audioRef.current = new Audio("/audio/gallery-vibes.mp3");
     audioRef.current.loop = true;
     audioRef.current.volume = 0.3;
-    return () => { audioRef.current?.pause(); };
+    portalAudioRef.current = new Audio("/audio/sticky-instrumental.mp3");
+    portalAudioRef.current.loop = true;
+    portalAudioRef.current.volume = 0;
+    return () => {
+      audioRef.current?.pause();
+      portalAudioRef.current?.pause();
+    };
   }, []);
 
   // Mobile audio unlock — retry playback on first user interaction after enter
@@ -234,11 +252,13 @@ export default function GalleryScene() {
     return () => clearInterval(check);
   }, [entered, autoTour, restartTour]);
 
-  // Auto-show gallery map at "Main Gallery" stop (once per tour)
+  // After the first auto-tour transition (stop 0 → stop 1), drop into manual
+  // mode and open the map so the user decides whether to resume guided.
   useEffect(() => {
     if (currentLabel === "Main Gallery" && !mapAutoShown.current && autoTour && entered) {
       mapAutoShown.current = true;
       setMapOpen(true);
+      setMode("manual");
     }
   }, [currentLabel, autoTour, entered]);
 
@@ -256,6 +276,32 @@ export default function GalleryScene() {
     snapRef.current = true;
   }, [updateTarget]);
 
+  // Tech Vault state — user is "inside" the vault at the Tech Vault stop or any
+  // of the hidden case stops. The case key (null or "backend"/"aicore"/...) is
+  // derived from the label so the TechVaultMap can highlight the active case.
+  const insideVault =
+    currentLabel === "Tech Vault" || currentLabel.startsWith("__vault_");
+  const currentCaseKey = currentLabel.startsWith("__vault_")
+    ? currentLabel.replace("__vault_", "")
+    : null;
+  const mainGalleryStopIdx = useMemo(
+    () => STOPS.findIndex((s) => s.label === "Main Gallery"),
+    []
+  );
+  const handleVaultCaseSelect = useCallback(
+    (caseIdx: number) => {
+      setMode("manual");
+      updateTarget(VAULT_CASE_START + caseIdx);
+      snapRef.current = true;
+    },
+    [updateTarget]
+  );
+  const handleVaultReturn = useCallback(() => {
+    setMode("manual");
+    updateTarget(mainGalleryStopIdx);
+    snapRef.current = true;
+  }, [updateTarget, mainGalleryStopIdx]);
+
   const toggleMusic = useCallback(() => {
     if (!audioRef.current) return;
     if (musicPlaying) audioRef.current.pause();
@@ -269,6 +315,55 @@ export default function GalleryScene() {
     setMusicPlaying(true);
   }, []);
 
+  // Fade helper — ramps a single audio element to targetVol over durationMs
+  const fadeAudio = useCallback((el: HTMLAudioElement | null, targetVol: number, durationMs: number) => {
+    if (!el) return;
+    const start = el.volume;
+    const delta = targetVol - start;
+    const startT = performance.now();
+    const step = () => {
+      const t = Math.min(1, (performance.now() - startT) / durationMs);
+      el.volume = Math.max(0, Math.min(1, start + delta * t));
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, []);
+
+  const handlePortalEnter = useCallback(() => {
+    if (portalStage !== "none") return;
+    // Return to wherever the user was (portal stop by default, but Book works too if proximity allows)
+    portalReturnStop.current = Math.max(0, Math.min(LAST, Math.round(targetRef.current)));
+    setMode("manual"); // auto-tour paused during portal
+    setPortalStage("entering");
+    // Start the secret room track (was silent until now)
+    if (portalAudioRef.current) {
+      portalAudioRef.current.volume = 0;
+      portalAudioRef.current.play().catch(() => {});
+    }
+    // Cross-fade: gallery music down, portal music up (if user hasn't muted)
+    if (audioRef.current && musicPlaying) fadeAudio(audioRef.current, 0, 900);
+    if (musicPlaying) fadeAudio(portalAudioRef.current, 0.5, 900);
+    // After animation, we're "inside" the room
+    setTimeout(() => {
+      setPortalStage((s) => (s === "entering" ? "inside" : s));
+    }, PORTAL_ANIM_MS);
+  }, [portalStage, fadeAudio, musicPlaying]);
+
+  const handlePortalExit = useCallback(() => {
+    if (portalStage !== "inside") return;
+    setPortalStage("exiting");
+    // Snap the gallery target to the return stop so STOPS resumes there cleanly after override releases
+    updateTarget(portalReturnStop.current);
+    snapRef.current = true;
+    // Cross-fade back
+    if (portalAudioRef.current) fadeAudio(portalAudioRef.current, 0, 700);
+    if (audioRef.current && musicPlaying) fadeAudio(audioRef.current, 0.3, 900);
+    setTimeout(() => {
+      portalAudioRef.current?.pause();
+      setPortalStage("none");
+    }, PORTAL_ANIM_MS);
+  }, [portalStage, fadeAudio, updateTarget, musicPlaying]);
+
   useEffect(() => {
     const t = setTimeout(() => { if (!entered) handleEnter(); }, 6000);
     return () => clearTimeout(t);
@@ -277,7 +372,7 @@ export default function GalleryScene() {
   // Scroll: accumulate and advance by fractions
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
-      if (anyOverlayOpen || !entered ) return;
+      if (anyOverlayOpen || !entered || portalActive) return;
       e.preventDefault();
       setAutoTour(false);
       // Smooth scroll: small increments
@@ -286,7 +381,7 @@ export default function GalleryScene() {
     };
     window.addEventListener("wheel", onWheel, { passive: false });
     return () => window.removeEventListener("wheel", onWheel);
-  }, [anyOverlayOpen, entered, updateTarget]);
+  }, [anyOverlayOpen, entered, updateTarget, portalActive, setAutoTour]);
 
   // Arrow keys: jump to next/prev stop (with press-and-hold repeat)
   useEffect(() => {
@@ -307,7 +402,20 @@ export default function GalleryScene() {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (anyOverlayOpen || !entered || e.repeat) return;
+      if (!entered || e.repeat) return;
+      // Esc exits the music room
+      if (e.key === "Escape" && portalStage === "inside") {
+        e.preventDefault();
+        handlePortalExit();
+        return;
+      }
+      if (anyOverlayOpen || portalActive) return;
+      // E (or e) triggers the portal when the camera is close enough
+      if ((e.key === "e" || e.key === "E") && portalReady) {
+        e.preventDefault();
+        handlePortalEnter();
+        return;
+      }
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault(); doNext();
         clearHold();
@@ -325,14 +433,14 @@ export default function GalleryScene() {
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp); clearHold(); };
-  }, [anyOverlayOpen, entered, updateTarget, setAutoTour]);
+  }, [anyOverlayOpen, entered, updateTarget, setAutoTour, portalActive, portalStage, portalReady, handlePortalExit, handlePortalEnter]);
 
   // Touch/swipe
   useEffect(() => {
     let startY = 0;
     const onStart = (e: TouchEvent) => { startY = e.touches[0].clientY; };
     const onMove = (e: TouchEvent) => {
-      if (anyOverlayOpen || !entered ) return;
+      if (anyOverlayOpen || !entered || portalActive) return;
       setAutoTour(false);
       const dy = startY - e.touches[0].clientY;
       startY = e.touches[0].clientY;
@@ -341,10 +449,9 @@ export default function GalleryScene() {
     window.addEventListener("touchstart", onStart, { passive: true });
     window.addEventListener("touchmove", onMove, { passive: true });
     return () => { window.removeEventListener("touchstart", onStart); window.removeEventListener("touchmove", onMove); };
-  }, [anyOverlayOpen, entered, updateTarget]);
+  }, [anyOverlayOpen, entered, updateTarget, portalActive, setAutoTour]);
 
   // Prev/next button handlers — snap to exact stops
-  const snapRef = useRef(false);
   const goNext = useCallback(() => {
     setAutoTour(false);
     const current = Math.floor(targetRef.current);
@@ -361,6 +468,14 @@ export default function GalleryScene() {
     snapRef.current = true;
   }, [updateTarget, setAutoTour]);
 
+  // Override camera target derived from portal stage. null = STOPS drive the camera.
+  const portalOverride =
+    portalStage === "entering" || portalStage === "inside"
+      ? MUSIC_ROOM_CAMERA
+      : portalStage === "exiting"
+        ? { pos: STOPS[portalReturnStop.current].pos, lookAt: STOPS[portalReturnStop.current].lookAt }
+        : null;
+
   return (
     <div className="fixed inset-0">
       <Canvas
@@ -369,6 +484,9 @@ export default function GalleryScene() {
         camera={{ fov: 55, near: 0.1, far: 30, position: [0, 1.7, 1.5] }}
         gl={{ antialias: false, alpha: false, powerPreference: "default", toneMapping: THREE.LinearToneMapping, toneMappingExposure: 1.6 }}
         style={{ background: "#050403" }}
+        onPointerMissed={() => {
+          if (portalStage === "inside") handlePortalExit();
+        }}
       >
         <TourController
           targetRef={targetRef}
@@ -377,7 +495,7 @@ export default function GalleryScene() {
           autoSpeed={autoSpeed}
           entered={entered}
           autoTour={autoTour}
-          anyOverlayOpen={anyOverlayOpen}
+          anyOverlayOpen={anyOverlayOpen || portalActive}
           loopResetFlag={loopResetFlag}
         />
         <Suspense fallback={null}>
@@ -386,7 +504,7 @@ export default function GalleryScene() {
             modalOpen={anyOverlayOpen}
             targetProgress={target}
             targetRef={targetRef}
-            autoTour={autoTour && entered && !anyOverlayOpen}
+            autoTour={autoTour && entered && !anyOverlayOpen && !portalActive}
             cameraDisabled={false}
             snapping={snapRef.current}
             onSnapDone={() => { snapRef.current = false; }}
@@ -397,6 +515,11 @@ export default function GalleryScene() {
               updateTarget(0);
               snapRef.current = false;
             }}
+            onPortalEnter={handlePortalEnter}
+            portalActive={portalActive}
+            portalOverride={portalOverride}
+            onPortalProximityChange={setPortalReady}
+            freeLook={portalStage === "inside"}
           />
         </Suspense>
       </Canvas>
@@ -435,9 +558,11 @@ export default function GalleryScene() {
                   <motion.span key={currentLabel} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} className="hidden text-[10px] uppercase tracking-[0.2em] text-gallery-accent md:block">{currentLabel}</motion.span>
                 )}
               </AnimatePresence>
-              <button onClick={() => setMapOpen(!mapOpen)} className={`rounded-full p-1.5 transition-all border ${mapOpen ? "border-gallery-accent/40 text-gallery-accent" : "border-white/10 text-gallery-muted hover:text-gallery-white"}`} aria-label="Gallery Map">
-                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
-              </button>
+              {!portalActive && (
+                <button onClick={() => setMapOpen(!mapOpen)} className={`rounded-full p-1.5 transition-all border ${mapOpen ? "border-gallery-accent/40 text-gallery-accent" : "border-white/10 text-gallery-muted hover:text-gallery-white"}`} aria-label="Gallery Map">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
+                </button>
+              )}
               <button onClick={toggleMusic} className={`rounded-full p-1.5 transition-all border ${musicPlaying ? "border-gallery-accent/40 text-gallery-accent" : "border-white/10 text-gallery-muted"}`} aria-label={musicPlaying ? "Mute" : "Unmute"}>
                 {musicPlaying ? <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0014 8.14v7.72A4.5 4.5 0 0016.5 12zM14 3.23v2.06A6.97 6.97 0 0121 12a6.97 6.97 0 01-7 6.71v2.06A9 9 0 0023 12 9 9 0 0014 3.23z" /></svg>
                 : <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M16.5 12A4.5 4.5 0 0014 8.14v2.12l2.45 2.45c.03-.2.05-.4.05-.71zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.92 8.92 0 0021 12a9 9 0 00-7-8.77v2.06A6.97 6.97 0 0121 12zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 003.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" /></svg>}
@@ -459,7 +584,7 @@ export default function GalleryScene() {
       )}
 
       {/* Manual mode — return to guided button */}
-      {entered && mode === "manual" && !anyOverlayOpen && (
+      {entered && mode === "manual" && !anyOverlayOpen && !portalActive && (
         <button
           onClick={() => setMode("guided")}
           className="fixed top-14 right-4 z-20 rounded-full border border-gallery-accent/30 bg-black/50 px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-gallery-accent backdrop-blur-sm transition-all hover:bg-gallery-accent hover:text-gallery-black"
@@ -468,16 +593,46 @@ export default function GalleryScene() {
         </button>
       )}
 
+      {/* Music-room exit hint */}
+      <AnimatePresence>
+        {portalStage === "inside" && (
+          <motion.button
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.35 }}
+            onClick={handlePortalExit}
+            className="fixed top-14 left-4 z-30 flex items-center gap-2 rounded-full border border-gallery-accent/40 bg-black/60 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.15em] text-gallery-accent backdrop-blur-sm transition-all hover:bg-gallery-accent hover:text-gallery-black"
+          >
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+            Exit Room
+            <span className="hidden md:inline text-gallery-muted/60 ml-1">· Esc</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
 
-      {/* Gallery Map */}
-      <GalleryMap
-        open={mapOpen}
-        onClose={() => setMapOpen(false)}
-        onSelectStop={handleMapSelect}
-        onContinueTour={() => { setMode("guided"); }}
-        currentLabel={currentLabel}
-      />
+
+      {/* Gallery Map — hidden while inside the music room. Swap to TechVaultMap
+          while the camera is inside the Tech Vault. */}
+      {!portalActive && !insideVault && (
+        <GalleryMap
+          open={mapOpen}
+          onClose={() => setMapOpen(false)}
+          onSelectStop={handleMapSelect}
+          onContinueTour={() => { setMode("guided"); }}
+          currentLabel={currentLabel}
+        />
+      )}
+      {!portalActive && insideVault && (
+        <TechVaultMap
+          open={mapOpen}
+          onClose={() => setMapOpen(false)}
+          onSelectCase={handleVaultCaseSelect}
+          onReturn={handleVaultReturn}
+          currentCaseKey={currentCaseKey}
+        />
+      )}
 
       {/* Project Modal */}
       <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />

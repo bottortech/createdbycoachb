@@ -1,14 +1,19 @@
 "use client";
 
-import { useRef, useMemo, useState } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import { useFrame, useThree, useLoader } from "@react-three/fiber";
 import { useTexture, Html } from "@react-three/drei";
 import * as THREE from "three";
+import dynamic from "next/dynamic";
 import { TDSLoader } from "three/examples/jsm/loaders/TDSLoader.js";
 import { Project } from "../gallery/ProjectModal";
 import WallArtwork from "./WallArtwork";
 import SpotLightWithTarget from "./SpotLightWithTarget";
 import { DiamondPedestal, EnvelopePedestal, PhonePedestal, ConnectPedestal } from  "./ServicePedestal";
+
+// Lazy-loaded — not bundled with initial gallery payload
+const MusicRoom = dynamic(() => import("./MusicRoom"), { ssr: false });
+import TechVault from "./TechVault";
 
 /* ------------------------------------------------------------------ */
 /*  STOPS — narrative order, spatial positions                         */
@@ -36,6 +41,10 @@ const GZ = -1.5;
 export const STOPS: GalleryStop[] = [
   { pos: [0, 1.7, 1.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
   { pos: [1.5, 1.7, -1.0],   lookAt: [5, 1.7, GZ],           label: "Main Gallery",          tier: 1 },
+  // Tech Vault — side alcove branching off the bottom wall at the x=3..5 doorway.
+  // Camera sits in the gallery just north of the widened doorway, elevated (y=2.5)
+  // so the sight-line clears the lintel (y=2.6) and frames all 7 vitrines through the opening.
+  { pos: [4, 2.5, -3.5],     lookAt: [4, 1.0, -9],           label: "Tech Vault",            tier: 2 },
   // Client/creative — top wall
   { pos: [6, 1.7, GZ],       lookAt: [6, 1.7, GZ + GW],      label: "Carla's Creation",      tier: 3 },
   { pos: [7, 1.7, GZ],       lookAt: [7, 1.7, GZ - GW],      label: "JB TV",                 tier: 3 },
@@ -53,11 +62,41 @@ export const STOPS: GalleryStop[] = [
   { pos: [15.5, 1.7, GZ],    lookAt: [15.5, 1.7, GZ + GW],   label: "WiggleWoo Character",   tier: 3 },
   // Closing
   { pos: [16.5, 1.7, GZ],    lookAt: [19, 1.9, GZ],          label: "Professor WiggleWoo",   tier: 1 },
-  // Service pedestals — last stop before loop restarts
+  // Service pedestals — last auto-tour stop
   { pos: [14, 2.8, GZ],       lookAt: [17.5, 0.5, GZ],        label: "Services",              tier: 2 },
+  // HIDDEN — portal approach on the east end wall. Reachable only by scrolling past Services.
+  { pos: [17, 1.7, 0],        lookAt: [19, 1.85, 0],          label: "",                      tier: 3 },
+  // HIDDEN — Tech Vault case stops (reachable only via the Tech Vault map).
+  // Back row (z=-10), left → right
+  { pos: [2, 1.5, -8.5],      lookAt: [2, 1.3, -10],          label: "__vault_backend",       tier: 3 },
+  { pos: [4, 1.5, -8.5],      lookAt: [4, 1.3, -10],          label: "__vault_aicore",        tier: 3 },
+  { pos: [6, 1.5, -8.5],      lookAt: [6, 1.3, -10],          label: "__vault_frontend",      tier: 3 },
+  // Front row (z=-6.5), left → right
+  { pos: [1.5, 1.5, -8],      lookAt: [1.5, 1.3, -6.5],       label: "__vault_devtools",      tier: 3 },
+  { pos: [3, 1.5, -8],        lookAt: [3, 1.3, -6.5],         label: "__vault_payments",      tier: 3 },
+  { pos: [4.5, 1.5, -8],      lookAt: [4.5, 1.3, -6.5],       label: "__vault_gamedev",       tier: 3 },
+  { pos: [6, 1.5, -8],        lookAt: [6, 1.3, -6.5],         label: "__vault_automation",    tier: 3 },
 ];
 
+// Last index in STOPS — used only for clamping camera interpolation bounds.
 const LAST = STOPS.length - 1;
+// Auto-tour ends at Services; anything after is only reachable via manual
+// navigation (scroll past Services, or the map).
+export const TOUR_LAST = STOPS.findIndex((s) => s.label === "Services");
+export const PORTAL_STOP = TOUR_LAST + 1;
+// Vault case stops live further down in STOPS; first case is right after the
+// portal approach. Keep these constants in sync with the stops below.
+export const VAULT_CASE_START = PORTAL_STOP + 1;
+export const VAULT_CASE_COUNT = 7;
+
+// Portal painting position + music-room camera for the override transition.
+// Portal is on the east end wall, right-of-book (z=0). The music room sits
+// directly behind the east wall — camera flies through in +x direction.
+export const PORTAL_PAINTING_POS: [number, number, number] = [19, 1.85, 0];
+export const MUSIC_ROOM_CAMERA = {
+  pos: [21, 1.7, 0] as [number, number, number],
+  lookAt: [25, 1.7, 0] as [number, number, number],
+};
 
 /* ------------------------------------------------------------------ */
 /*  ARTWORK DATA — repositioned to match narrative stop order          */
@@ -69,6 +108,10 @@ interface ArtworkDef {
   width: number;
   frame: "square" | "landscape" | "portrait";
   project: Project;
+  isPortal?: boolean;
+  noPlaque?: boolean;
+  noLight?: boolean;
+  noInteraction?: boolean;
 }
 
 const ARTWORKS: ArtworkDef[] = [
@@ -119,11 +162,30 @@ const ARTWORKS: ArtworkDef[] = [
       tags: ["Chrome Extension", "Browser Tool"],
       link: "https://chromewebstore.google.com/detail/dmofdijhloefhkhheimljfjchccgnhgf?utm_source=item-share-cb", linkLabel: "Get the Extension" }},
 
-  // End wall — Book
+  // === East end wall cluster: left image + book + portal (evenly spaced) ===
+  // Wall spans z from -4 to +1 (width 5m, centered at z = GZ = -1.5).
+  // Centers at z = -3, -1.5, 0 → 1.5m between each.
+
+  // Left image — decorative only, no interaction
+  { position: [19, 1.85, -3], rotation: [0, -Math.PI / 2, 0], width: 0.8, frame: "portrait",
+    noPlaque: true,
+    noLight: true,
+    noInteraction: true,
+    project: { title: "__leftImage", category: "", image: "/images/left-side.png",
+      description: "", tags: [] }},
+
+  // Book — centered on end wall
   { position: [19, 2.0, GZ], rotation: [0, -Math.PI / 2, 0], width: 1.2, frame: "portrait",
     project: { title: "Professor WiggleWoo", category: "Featured Publication", image: "/images/book-cover.jpg",
       description: "A creative and imaginative story that brings wonder, learning, and fun to readers of all ages. This is more than a book. It is the beginning of a universe.",
       tags: ["Published", "Children's Literature", "Education"], link: "https://a.co/d/0di3W4os", linkLabel: "Buy on Amazon" }},
+
+  // Portal — chess king, right of book. Triggers the music room.
+  { position: PORTAL_PAINTING_POS, rotation: [0, -Math.PI / 2, 0], width: 0.8, frame: "portrait",
+    isPortal: true,
+    noPlaque: true,
+    noLight: true,
+    project: { title: "__portal", category: "", image: "/images/right-side.png", description: "", tags: [] }},
 ];
 
 /* ------------------------------------------------------------------ */
@@ -265,6 +327,11 @@ interface GalleryRoomProps {
   onLabelChange: (label: string) => void;
   onOpenPanel?: (panel: string) => void;
   onRestartLoop?: () => void;
+  onPortalEnter?: () => void;
+  portalActive?: boolean;
+  portalOverride?: { pos: [number, number, number]; lookAt: [number, number, number] } | null;
+  onPortalProximityChange?: (ready: boolean) => void;
+  freeLook?: boolean;
 }
 
 export default function GalleryRoom({
@@ -280,6 +347,11 @@ export default function GalleryRoom({
   snapping = false,
   onSnapDone,
   onRestartLoop,
+  onPortalEnter,
+  portalActive = false,
+  portalOverride = null,
+  onPortalProximityChange,
+  freeLook = false,
 }: GalleryRoomProps) {
   const { camera } = useThree();
 
@@ -290,6 +362,23 @@ export default function GalleryRoom({
   const [focusedLabel, setFocusedLabel] = useState("");
   const smoothLook = useRef(0);
 
+  // Portal override — smooth lerp state (initialized from live camera on first use)
+  const overrideSmoothPos = useRef(new THREE.Vector3());
+  const overrideSmoothLook = useRef(new THREE.Vector3());
+  const overrideInitialized = useRef(false);
+  const overrideTargetPos = useRef(new THREE.Vector3());
+  const overrideTargetLook = useRef(new THREE.Vector3());
+
+  // Portal proximity — computed each frame, reported up when it crosses the threshold
+  const portalPaintingVec = useRef(new THREE.Vector3(...PORTAL_PAINTING_POS));
+  const portalReadyState = useRef(false);
+
+  // Free-look (music room) — yaw/pitch driven by mouse drag
+  const yawRef = useRef(Math.PI); // Math.PI = facing +z by default (music-room start orientation)
+  const pitchRef = useRef(0);
+  const freeLookSeeded = useRef(false);
+  const freeLookEuler = useRef(new THREE.Euler(0, 0, 0, "YXZ"));
+
   const wallTex = useTexture("/images/gallery/wall.jpg");
   const floorTex = useTexture("/images/gallery/floor.jpg");
   const ceilingTex = useTexture("/images/gallery/ceiling.jpg");
@@ -299,11 +388,102 @@ export default function GalleryRoom({
     wallTex.repeat.set(2, 1); ceilingTex.repeat.set(3, 1); floorTex.repeat.set(4, 2);
   }, [wallTex, ceilingTex, floorTex]);
 
+  // Free-look drag — active only inside the music room. Horizontal drag → yaw, vertical → pitch.
+  useEffect(() => {
+    if (!freeLook) {
+      freeLookSeeded.current = false;
+      document.body.style.cursor = "default";
+      return;
+    }
+    document.body.style.cursor = "grab";
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    const SENS = 0.0035;
+    const MAX_PITCH = Math.PI / 2 - 0.15;
+
+    const onDown = (e: PointerEvent) => {
+      // Ignore drags that originate on iframes/links inside the media board
+      const target = e.target as HTMLElement;
+      if (target.closest("iframe") || target.closest("a")) return;
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      document.body.style.cursor = "grabbing";
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      yawRef.current -= dx * SENS;
+      pitchRef.current = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitchRef.current - dy * SENS));
+    };
+    const onUp = () => {
+      dragging = false;
+      document.body.style.cursor = "grab";
+    };
+
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.body.style.cursor = "default";
+    };
+  }, [freeLook]);
+
   useFrame(({ clock }, delta) => {
     if (cameraDisabled) return;
 
-    const target = targetRef.current;
     const dt = Math.min(delta, 0.1); // clamp for tab-refocus safety
+
+    // --- Portal override path: direct lerp, bypasses STOPS ---
+    if (portalOverride) {
+      if (!overrideInitialized.current) {
+        overrideInitialized.current = true;
+        overrideSmoothPos.current.copy(camera.position);
+        // Seed look from current lookAt proxy
+        camera.getWorldDirection(_v3a);
+        overrideSmoothLook.current.copy(camera.position).add(_v3a.multiplyScalar(2));
+      }
+      overrideTargetPos.current.set(...portalOverride.pos);
+      overrideTargetLook.current.set(...portalOverride.lookAt);
+      const rate = 2.0;
+      const k = 1 - Math.exp(-rate * dt);
+      overrideSmoothPos.current.lerp(overrideTargetPos.current, k);
+      camera.position.copy(overrideSmoothPos.current);
+
+      if (freeLook) {
+        // Seed yaw/pitch from the entry lookAt on the first inside frame. Use
+        // camera.lookAt → extract YXZ euler so the math always matches three's
+        // own convention (custom atan2 formulas are easy to get wrong).
+        if (!freeLookSeeded.current) {
+          freeLookSeeded.current = true;
+          camera.lookAt(overrideTargetLook.current);
+          freeLookEuler.current.setFromQuaternion(camera.quaternion, "YXZ");
+          yawRef.current = freeLookEuler.current.y;
+          pitchRef.current = freeLookEuler.current.x;
+        }
+        freeLookEuler.current.set(pitchRef.current, yawRef.current, 0, "YXZ");
+        camera.quaternion.setFromEuler(freeLookEuler.current);
+      } else {
+        // Cinematic entry / exit — classic lookAt lerp
+        overrideSmoothLook.current.lerp(overrideTargetLook.current, k * 1.2);
+        camera.lookAt(overrideSmoothLook.current);
+      }
+      // Keep smoothProgress frozen at wherever the user was — so on exit, STOPS resumes cleanly.
+      onLabelChange("");
+      return;
+    }
+    overrideInitialized.current = false;
+
+    const target = targetRef.current;
 
     // Loop reset detection
     if (smoothProgress.current - target > 2) {
@@ -343,10 +523,17 @@ export default function GalleryRoom({
     getCamera(smoothLook.current, tempPos.current, camLook.current);
     camera.lookAt(camLook.current);
 
-    onProgressChange(smoothProgress.current / LAST);
+    onProgressChange(Math.min(1, smoothProgress.current / TOUR_LAST));
     const label = getLabel(smoothLook.current);
     onLabelChange(label);
     setFocusedLabel(moveDelta < 0.2 ? label : "");
+
+    // Portal proximity — fires only on edge transitions to avoid spamming React
+    const ready = camera.position.distanceTo(portalPaintingVec.current) < 3.5 && !portalActive;
+    if (ready !== portalReadyState.current) {
+      portalReadyState.current = ready;
+      onPortalProximityChange?.(ready);
+    }
   });
 
   const wc = "#a8a4a0";
@@ -380,7 +567,9 @@ export default function GalleryRoom({
 
       {/* Main gallery */}
       <mesh position={[10, H / 2, GZ + GW]} rotation={[0, Math.PI, 0]} receiveShadow><planeGeometry args={[20, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
-      <mesh position={[10, H / 2, GZ - GW]} receiveShadow><planeGeometry args={[20, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
+      {/* Bottom gallery wall — split around the Tech Vault doorway (x=3..5, 2m wide) */}
+      <mesh position={[1.5, H / 2, GZ - GW]} receiveShadow><planeGeometry args={[3, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
+      <mesh position={[12.5, H / 2, GZ - GW]} receiveShadow><planeGeometry args={[15, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
       <mesh position={[19, H / 2, GZ]} rotation={[0, -Math.PI / 2, 0]} receiveShadow><planeGeometry args={[GW * 2, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
 
       {/* Track rails */}
@@ -422,9 +611,31 @@ export default function GalleryRoom({
       {ARTWORKS.map((art) => {
         const isFocused = !cameraDisabled && focusedLabel === art.project.title;
         return (
-          <WallArtwork key={art.project.title} position={art.position} rotation={art.rotation} width={art.width} frameType={art.frame} project={art.project} onClick={() => onSelectProject(art.project)} isActive={isFocused} />
+          <WallArtwork
+            key={art.project.title}
+            position={art.position}
+            rotation={art.rotation}
+            width={art.width}
+            frameType={art.frame}
+            project={art.project}
+            onClick={() => {
+              if (art.noInteraction) return;
+              if (art.isPortal) onPortalEnter?.();
+              else onSelectProject(art.project);
+            }}
+            isActive={isFocused}
+            isPortal={art.isPortal}
+            noPlaque={art.noPlaque}
+            noLight={art.noLight}
+          />
         );
       })}
+
+      {/* Hidden Music Room — only mounted once the portal has been triggered */}
+      {portalActive && <MusicRoom onOpenPanel={onOpenPanel} />}
+
+      {/* Tech Vault — dedicated alcove branching off the top wall at x=3..4 */}
+      <TechVault />
 
     </>
   );

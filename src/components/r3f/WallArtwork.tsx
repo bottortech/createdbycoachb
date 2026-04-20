@@ -1,11 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useTexture, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { Project } from "../gallery/ProjectModal";
 import GalleryLight from "./GalleryLight";
+
+// Portal is only clickable when the camera is within this many world units.
+// ~3.5m covers both the dedicated portal stop (2m) and the WiggleWoo Character
+// stop (~3.2m), so users can discover it peripherally from the Character view.
+const PORTAL_PROXIMITY = 3.5;
 
 const WORK_TYPE: Record<string, string> = {
   "WiggleWoo's Word Quest": "Educational Game / Web App",
@@ -43,6 +48,9 @@ interface WallArtworkProps {
   project: Project;
   onClick: () => void;
   isActive?: boolean;
+  isPortal?: boolean;
+  noPlaque?: boolean;
+  noLight?: boolean;
 }
 
 export default function WallArtwork({
@@ -53,9 +61,15 @@ export default function WallArtwork({
   project,
   onClick,
   isActive = false,
+  isPortal = false,
+  noPlaque = false,
+  noLight = false,
 }: WallArtworkProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
+  const portalReadyRef = useRef(false);
+  const { camera } = useThree();
+  const portalWorldPos = useRef(new THREE.Vector3(...position));
 
   const aspect = FRAME_ASPECT[frameType];
   const height = width / aspect;
@@ -86,6 +100,9 @@ export default function WallArtwork({
     if (!groupRef.current) return;
     const targetZ = hovered ? 0.02 : 0;
     groupRef.current.position.z += (targetZ - groupRef.current.position.z) * 0.08;
+    if (isPortal) {
+      portalReadyRef.current = camera.position.distanceTo(portalWorldPos.current) < PORTAL_PROXIMITY;
+    }
   });
 
   // Plaque dimensions
@@ -100,9 +117,19 @@ export default function WallArtwork({
     <group position={position} rotation={rotation}>
       <group
         ref={groupRef}
-        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; }}
+        onPointerOver={(e) => {
+          // Portal is keyboard-triggered — stays fully inert on hover/click
+          if (isPortal) return;
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = "pointer";
+        }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = "default"; }}
-        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onClick={(e) => {
+          if (isPortal) return;
+          e.stopPropagation();
+          onClick();
+        }}
       >
         {hasFrameTexture ? (
           <>
@@ -183,7 +210,7 @@ export default function WallArtwork({
       </group>
 
       {/* Hover glow — frame-shaped golden outline matching the piece */}
-      {hovered && (
+      {hovered && !isPortal && (
         <>
           {/* Outer glow plane */}
           <mesh position={[0, 0, -0.008]}>
@@ -216,7 +243,8 @@ export default function WallArtwork({
         </>
       )}
 
-      {/* Plaque — positioned below the frame's visual bottom */}
+      {/* Plaque — positioned below the frame's visual bottom (hidden for portal + decoys) */}
+      {!isPortal && !noPlaque && (
       <group position={[0, -(hasFrameTexture ? (frameType === "square" ? frameH / 2 - 0.12 : frameH / 2) : height / 2) - 0.08, 0.005]}>
         {/* Brass plaque — 3D geometry with metallic gold finish */}
         <mesh>
@@ -243,11 +271,14 @@ export default function WallArtwork({
           {(WORK_TYPE[project.title] || project.category).toUpperCase()}
         </Text>
       </group>
+      )}
 
-      {/* Gallery picture light — above the frame */}
-      <group position={[0, (hasFrameTexture ? frameH / 2 : height / 2) + 0.08, 0.01]}>
-        <GalleryLight isActive={isActive} width={hasFrameTexture ? frameW : width} />
-      </group>
+      {/* Gallery picture light — above the frame (hidden for decoys) */}
+      {!noLight && (
+        <group position={[0, (hasFrameTexture ? frameH / 2 : height / 2) + 0.08, 0.01]}>
+          <GalleryLight isActive={isActive} width={hasFrameTexture ? frameW : width} />
+        </group>
+      )}
 
     </group>
   );
