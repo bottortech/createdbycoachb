@@ -69,11 +69,11 @@ const CATEGORIES: CategoryData[] = [
   { id: "backend",    position: [2, 0, -10],   title: "Backend",    tagline: "Systems that run without friction.",     chips: ["Node.js", "APIs", "Railway"] },
   { id: "ai-core",    position: [4, 0, -10],   title: "AI Core",    tagline: "Where intelligence becomes execution.",  chips: ["Claude", "ChatGPT", "AI APIs"] },
   { id: "frontend",   position: [6, 0, -10],   title: "Frontend",   tagline: "Interfaces that feel effortless.",       chips: ["React", "Vite", "Three.js", "Extensions"] },
-  // Front row (z=-6.5, nearer the door) — applied domains
-  { id: "devtools",   position: [1.5, 0, -6.5], title: "Dev Tools",  tagline: "Built, tested, and shipped.",            chips: ["VS Code", "Xcode", "GitHub"] },
-  { id: "payments",   position: [3, 0, -6.5],   title: "Payments",   tagline: "Seamless transactions, real products.",  chips: ["Stripe", "Square"] },
-  { id: "gamedev",    position: [4.5, 0, -6.5], title: "Game Dev",   tagline: "Interactive worlds built from scratch.", chips: ["Unity", "C#"] },
-  { id: "automation", position: [6, 0, -6.5],   title: "Automation", tagline: "Turning processes into systems.",        chips: ["PDF Parsing", "Matching", "Workflows"] },
+  // Front row (z=-7.5, pushed back from the doorway) — applied domains
+  { id: "devtools",   position: [1.5, 0, -7.5], title: "Dev Tools",  tagline: "Built, tested, and shipped.",            chips: ["VS Code", "Xcode", "GitHub"] },
+  { id: "payments",   position: [3, 0, -7.5],   title: "Payments",   tagline: "Seamless transactions, real products.",  chips: ["Stripe", "Square"] },
+  { id: "gamedev",    position: [4.5, 0, -7.5], title: "Game Dev",   tagline: "Interactive worlds built from scratch.", chips: ["Unity", "C#"] },
+  { id: "automation", position: [6, 0, -7.5],   title: "Automation", tagline: "Turning processes into systems.",        chips: ["PDF Parsing", "Matching", "Workflows"] },
 ];
 
 // Animated logo plaque — gentle sine float + subtle rotation + emissive pulse.
@@ -119,12 +119,10 @@ function FloatingChip({ label, baseY }: { label: string; baseY: number }) {
           depthWrite={false}
         />
       </mesh>
-      {/* Cream backing plate */}
-      <mesh position={[0, 0, -0.005]}>
-        <planeGeometry args={[CHIP_SIZE, CHIP_SIZE]} />
-        <meshBasicMaterial color="#f0e8d0" side={THREE.DoubleSide} />
-      </mesh>
-      {/* Logo plane + click target */}
+      {/* Logo plane — cutout rendering. alphaTest=0.5 causes transparent PNG
+          pixels (alpha < 50%) to be *discarded* entirely instead of blending
+          with scene black. Stays on the opaque render path so it renders
+          reliably inside the transparent glass case. No backing plate. */}
       <mesh
         position={[0, 0, 0.01]}
         onClick={(e) => {
@@ -143,6 +141,7 @@ function FloatingChip({ label, baseY }: { label: string; baseY: number }) {
           map={tex}
           side={THREE.DoubleSide}
           toneMapped={false}
+          alphaTest={0.5}
         />
       </mesh>
     </group>
@@ -354,6 +353,7 @@ export default function TechVault() {
   const wallTex = useTexture("/images/gallery/wall.jpg");
   const floorTex = useTexture("/images/gallery/floor.jpg");
   const ceilingTex = useTexture("/images/gallery/ceiling.jpg");
+  const bannerTex = useTexture("/images/tech-vault.png");
 
   useMemo(() => {
     [wallTex, floorTex, ceilingTex].forEach((t) => {
@@ -362,7 +362,8 @@ export default function TechVault() {
     wallTex.repeat.set(2, 1);
     floorTex.repeat.set(3, 3);
     ceilingTex.repeat.set(2, 1);
-  }, [wallTex, floorTex, ceilingTex]);
+    bannerTex.colorSpace = THREE.SRGBColorSpace;
+  }, [wallTex, floorTex, ceilingTex, bannerTex]);
 
   // South wall is split by the doorway; compute segment widths
   const leftSegWidth = DOOR_X_MIN - ALCOVE_X_MIN;
@@ -445,17 +446,16 @@ export default function TechVault() {
         <boxGeometry args={[0.04, 2.6, 0.08]} />
         <meshStandardMaterial color="#8a6a2e" emissive="#c9a84c" emissiveIntensity={0.2} metalness={0.85} roughness={0.35} />
       </mesh>
-      {/* TECH VAULT label above the door — facing into the gallery (+z direction) */}
-      <Text
-        position={[(DOOR_X_MIN + DOOR_X_MAX) / 2, 2.82, ALCOVE_Z_MAX + 0.01]}
-        fontSize={0.11}
-        color="#e8c56a"
-        anchorX="center"
-        anchorY="middle"
-        letterSpacing={0.3}
-      >
-        TECH VAULT
-      </Text>
+      {/* TECH VAULT banner above the door — PNG image facing into the gallery */}
+      <mesh position={[(DOOR_X_MIN + DOOR_X_MAX) / 2, 3.0, ALCOVE_Z_MAX + 0.015]}>
+        <planeGeometry args={[1.8, 1.2]} />
+        <meshBasicMaterial
+          map={bannerTex}
+          transparent
+          alphaTest={0.05}
+          toneMapped={false}
+        />
+      </mesh>
 
       {/* ====== VITRINES ====== */}
       {CATEGORIES.map((cat) => (

@@ -19,6 +19,7 @@ const STOP_META: Record<string, { thumb: string; type: string }> = {
   "WiggleWoo Character":    { thumb: "/images/Wiggle-Woo-Character.png", type: "Character Design" },
   "Professor WiggleWoo":    { thumb: "/images/book-cover.jpg",    type: "Children's Book" },
   "Services":               { thumb: "/images/coachb-services.png", type: "Services & Contact" },
+  "Tech Vault":             { thumb: "/images/techvault-logo.png", type: "Skills & Tech Stack" },
 };
 
 interface GalleryMapProps {

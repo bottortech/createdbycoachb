@@ -41,21 +41,15 @@ export default function GalleryLight({ isActive, width }: GalleryLightProps) {
             metalness={0.8}
             roughness={0.2}
             emissive="#ffd080"
-            emissiveIntensity={isActive ? 0.8 : 0.1}
+            emissiveIntensity={isActive ? 1.5 : 0.04}
+            toneMapped={false}
           />
         </mesh>
       </group>
 
-      {/* Warm wall wash light — only rendered when artwork is active */}
-      {isActive && (
-        <pointLight
-          position={[0, -0.03, barProtrusion + 0.02]}
-          color="#ffe0a0"
-          intensity={3.5}
-          distance={1.5}
-          decay={2}
-        />
-      )}
+      {/* Wall-wash pointLight removed — the brass bar's emissive glow still
+          visibly "turns on" when the artwork is focused, but the artwork itself
+          is no longer illuminated brighter by a per-piece light. */}
     </group>
   );
 }

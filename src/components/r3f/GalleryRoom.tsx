@@ -71,11 +71,11 @@ export const STOPS: GalleryStop[] = [
   { pos: [2, 1.5, -8.5],      lookAt: [2, 1.3, -10],          label: "__vault_backend",       tier: 3 },
   { pos: [4, 1.5, -8.5],      lookAt: [4, 1.3, -10],          label: "__vault_aicore",        tier: 3 },
   { pos: [6, 1.5, -8.5],      lookAt: [6, 1.3, -10],          label: "__vault_frontend",      tier: 3 },
-  // Front row (z=-6.5), left → right
-  { pos: [1.5, 1.5, -8],      lookAt: [1.5, 1.3, -6.5],       label: "__vault_devtools",      tier: 3 },
-  { pos: [3, 1.5, -8],        lookAt: [3, 1.3, -6.5],         label: "__vault_payments",      tier: 3 },
-  { pos: [4.5, 1.5, -8],      lookAt: [4.5, 1.3, -6.5],       label: "__vault_gamedev",       tier: 3 },
-  { pos: [6, 1.5, -8],        lookAt: [6, 1.3, -6.5],         label: "__vault_automation",    tier: 3 },
+  // Front row (z=-7.5, pushed back), left → right — camera stays 1.5m in front
+  { pos: [1.5, 1.5, -9],      lookAt: [1.5, 1.3, -7.5],       label: "__vault_devtools",      tier: 3 },
+  { pos: [3, 1.5, -9],        lookAt: [3, 1.3, -7.5],         label: "__vault_payments",      tier: 3 },
+  { pos: [4.5, 1.5, -9],      lookAt: [4.5, 1.3, -7.5],       label: "__vault_gamedev",       tier: 3 },
+  { pos: [6, 1.5, -9],        lookAt: [6, 1.3, -7.5],         label: "__vault_automation",    tier: 3 },
 ];
 
 // Last index in STOPS — used only for clamping camera interpolation bounds.
@@ -562,8 +562,11 @@ export default function GalleryRoom({
       <mesh position={[-EW, H / 2, 0.5]} receiveShadow><planeGeometry args={[3.5, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
       <mesh position={[EW, H / 2, 1.2]} rotation={[0, Math.PI, 0]} receiveShadow><planeGeometry args={[2, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
       {/* Display wall — centered, with opening on right side for gallery access */}
-      <mesh position={[-0.5, H / 2, -1]} receiveShadow><planeGeometry args={[4.5, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
-      <mesh position={[-0.5, H / 2, -1]} rotation={[0, Math.PI, 0]}><planeGeometry args={[4.5, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
+      {/* Entry back wall — shortened from 4.5m to 3.65m (chopped 0.85m from the
+          right end) so the sight-line past WiggleWoo opens toward the Tech Vault.
+          WiggleWoo piece ends at x=+0.85; wall now ends at x=+0.9. */}
+      <mesh position={[-0.925, H / 2, -1]} receiveShadow><planeGeometry args={[3.65, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
+      <mesh position={[-0.925, H / 2, -1]} rotation={[0, Math.PI, 0]}><planeGeometry args={[3.65, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
 
       {/* Main gallery */}
       <mesh position={[10, H / 2, GZ + GW]} rotation={[0, Math.PI, 0]} receiveShadow><planeGeometry args={[20, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
