@@ -4,15 +4,15 @@ import { useTexture, Html, Text } from "@react-three/drei";
 import * as THREE from "three";
 import { useMemo } from "react";
 import SpotLightWithTarget from "./SpotLightWithTarget";
-import GalleryLight from "./GalleryLight";
 
 // Room bounds — sits directly behind gallery east wall (x = 19). Deep enough
 // that the back wall never fills the viewport at any browser aspect ratio.
 // Camera enters at (19.5, 1.7, 0) looking +x (toward the back wall).
 const X_MIN = 19;
-const X_MAX = 29; // 10m deep — plenty of side-wall real estate for album pieces
-const Z_MIN = -4;
-const Z_MAX = 4;
+const X_MAX = 34; // 15m deep — back wall pushed further so the camera at x=21
+                  //           has plenty of room between entry and media board
+const Z_MIN = -6;
+const Z_MAX = 6;  // 12m wide — open lounge feel
 const HEIGHT = 4.5;
 const CX = (X_MIN + X_MAX) / 2;
 const CZ = (Z_MIN + Z_MAX) / 2;
@@ -22,9 +22,11 @@ const DEPTH_X = X_MAX - X_MIN;
 // Real media endpoints
 const SPOTIFY_SRC =
   "https://open.spotify.com/embed/artist/5g9KSIefKirB7JMpZvTNw5?utm_source=generator&theme=0";
-const YT_1 = "CpkCMAmhHc8";
-const YT_2 = "ju3vv4EiEW0";
-const YT_3 = "F51zQmvtruE";
+// YouTube clips — temporarily hidden from the wall; bringing them back in a
+// different layout later.
+// const YT_1 = "CpkCMAmhHc8";
+// const YT_2 = "ju3vv4EiEW0";
+// const YT_3 = "F51zQmvtruE";
 const APPLE_URL = "https://music.apple.com/us/artist/manny-baby/1131992992";
 
 
@@ -88,7 +90,9 @@ function createAlbumTexture(baseColor: string): THREE.CanvasTexture {
   return tex;
 }
 
-// Modern floating frameless album panel with plaque + gallery light.
+// Framed album display — dark canvas-wrap backboard, flat gilt border plate,
+// and the album artwork on top. No external gallery light — the frame picks
+// up the room's ambient + spot wash.
 interface AlbumPieceProps {
   position: [number, number, number];
   rotation: [number, number, number];
@@ -96,41 +100,50 @@ interface AlbumPieceProps {
   label: string;
 }
 function AlbumPiece({ position, rotation, texture, label }: AlbumPieceProps) {
+  const W = 1.4; // outer frame width
+  const H = 1.4; // outer frame height
+  const FRAME = 0.09; // visible gilt border thickness
+  const ART = W - FRAME * 2; // inner artwork dimension
+
   return (
     <group position={position} rotation={rotation}>
-      {/* Dark canvas-wrap panel standing 2cm off the wall */}
-      <mesh position={[0, 0, 0.01]}>
-        <boxGeometry args={[1.0, 1.0, 0.02]} />
-        <meshStandardMaterial color="#0a0807" roughness={0.7} />
+      {/* Dark back board — sits 1cm off the wall */}
+      <mesh position={[0, 0, 0.01]} castShadow>
+        <boxGeometry args={[W + 0.04, H + 0.04, 0.02]} />
+        <meshStandardMaterial color="#060504" roughness={0.6} />
       </mesh>
-      {/* Album face */}
-      <mesh position={[0, 0, 0.0251]}>
-        <planeGeometry args={[1.0, 1.0]} />
-        <meshStandardMaterial map={texture} roughness={0.55} />
+
+      {/* Gilt border — flat plate slightly forward of the backboard */}
+      <mesh position={[0, 0, 0.022]}>
+        <planeGeometry args={[W, H]} />
+        <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.28} />
       </mesh>
-      {/* Gallery picture light above */}
-      <group position={[0, 0.58, 0.02]}>
-        <GalleryLight width={1.0} isActive={false} />
-      </group>
+
+      {/* Album artwork — on top of the gilt border, showing the border around it */}
+      <mesh position={[0, 0, 0.024]}>
+        <planeGeometry args={[ART, ART]} />
+        <meshStandardMaterial map={texture} roughness={0.5} />
+      </mesh>
+
       {/* Gold plaque below */}
-      <group position={[0, -0.65, 0.015]}>
+      <group position={[0, -H / 2 - 0.13, 0.02]}>
         <mesh>
-          <planeGeometry args={[0.6, 0.12]} />
+          <boxGeometry args={[0.7, 0.14, 0.012]} />
           <meshStandardMaterial
             color="#c9a84c"
             emissive="#c9a84c"
-            emissiveIntensity={0.15}
+            emissiveIntensity={0.12}
             metalness={0.9}
-            roughness={0.35}
+            roughness={0.3}
           />
         </mesh>
         <Text
-          position={[0, 0, 0.003]}
-          fontSize={0.045}
+          position={[0, 0, 0.009]}
+          fontSize={0.05}
           color="#0a0807"
           anchorX="center"
           anchorY="middle"
-          letterSpacing={0.22}
+          letterSpacing={0.2}
         >
           {label}
         </Text>
@@ -241,51 +254,82 @@ export default function MusicRoom(_props: Props) {
         <meshStandardMaterial map={wallTex} color="#a8a4a0" />
       </mesh>
 
-      {/* ====== ALBUM ARTWORKS — 2 per side wall ======
-          Spread along the 10m side walls. Camera lands at x=21 so you can
-          turn slightly to catch each piece without losing the media wall. */}
+      {/* ====== ALBUM ARTWORKS — 2 per side wall, 4 total ======
+          Both pairs mounted near the back wall so they flank the media board
+          when viewed from the entry. The closer piece reads with a small pan,
+          the deeper one anchors toward the corner. */}
       {/* South wall (z = Z_MIN), faces +z */}
       <AlbumPiece
-        position={[21, 1.7, Z_MIN + 0.02]}
+        position={[29.5, 1.7, Z_MIN + 0.02]}
         rotation={[0, 0, 0]}
         texture={album1Tex}
         label="ALBUM I"
       />
       <AlbumPiece
-        position={[25.5, 1.7, Z_MIN + 0.02]}
+        position={[31.5, 1.7, Z_MIN + 0.02]}
         rotation={[0, 0, 0]}
         texture={album2Tex}
         label="ALBUM II"
       />
       {/* North wall (z = Z_MAX), faces -z */}
       <AlbumPiece
-        position={[21, 1.7, Z_MAX - 0.02]}
+        position={[29.5, 1.7, Z_MAX - 0.02]}
         rotation={[0, Math.PI, 0]}
         texture={album3Tex}
         label="ALBUM III"
       />
       <AlbumPiece
-        position={[25.5, 1.7, Z_MAX - 0.02]}
+        position={[31.5, 1.7, Z_MAX - 0.02]}
         rotation={[0, Math.PI, 0]}
         texture={album4Tex}
         label="ALBUM IV"
       />
 
-      {/* ====== MEDIA BOARD — borderless, just the content ====== */}
+      {/* ====== MEDIA BOARD — mounted flush to the back wall ======
+          The Html content is a DOM overlay; a dark 3D panel behind it gives
+          the media a physical "screen" presence on the wall. */}
       <group position={[X_MAX - 0.005, 2, CZ]} rotation={[0, -Math.PI / 2, 0]}>
-        {/* Media content — anchored to the back wall */}
+        {/* Backing panel — dark glossy plate the media content sits on */}
+        <mesh position={[0, -0.3, 0.003]}>
+          <planeGeometry args={[5.2, 3.2]} />
+          <meshStandardMaterial color="#0a0806" metalness={0.3} roughness={0.45} />
+        </mesh>
+        {/* Thin gilt border around the backing panel */}
+        {([
+          [0, 1.3, 5.3, 0.03], // top
+          [0, -1.9, 5.3, 0.03], // bottom
+          [-2.65, -0.3, 0.03, 3.23], // left
+          [2.65, -0.3, 0.03, 3.23], // right
+        ] as const).map(([px, py, bw, bh], i) => (
+          <mesh key={i} position={[px, py, 0.006]}>
+            <planeGeometry args={[bw, bh]} />
+            <meshStandardMaterial
+              color="#c9a84c"
+              emissive="#c9a84c"
+              emissiveIntensity={0.15}
+              metalness={0.85}
+              roughness={0.3}
+            />
+          </mesh>
+        ))}
+        {/* Media content anchored to the back-wall frame. Using DOM overlay
+            mode (not transform) because iframes inside CSS3D have render
+            quirks. Sized in viewport units so the Spotify embed roughly
+            matches the frame's projected screen area from the fixed entry
+            camera across typical desktop aspect ratios. */}
         <Html
           center
-          position={[0, -0.3, 0.008]}
+          position={[0, -0.3, 0.012]}
           zIndexRange={[50, 0]}
           style={{ pointerEvents: "auto", userSelect: "none" }}
         >
           <div
             style={{
-              width: "860px",
+              width: "min(38vw, 520px)",
               display: "flex",
               flexDirection: "column",
-              gap: "10px",
+              alignItems: "center",
+              gap: "14px",
               fontFamily: "system-ui, -apple-system, sans-serif",
               color: "#fff",
             }}
@@ -294,41 +338,25 @@ export default function MusicRoom(_props: Props) {
               title="Spotify"
               src={SPOTIFY_SRC}
               width="100%"
-              height="252"
+              height="230"
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"
-              style={{ border: 0, display: "block", borderRadius: "6px" }}
+              style={{ border: 0, display: "block", borderRadius: "8px", width: "100%" }}
             />
-            <div style={{ display: "flex", gap: "9px", width: "100%" }}>
-              {[YT_1, YT_2, YT_3].map((id) => (
-                <iframe
-                  key={id}
-                  title={`YT ${id}`}
-                  width="100%"
-                  height="160"
-                  src={`https://www.youtube-nocookie.com/embed/${id}`}
-                  allow="encrypted-media; picture-in-picture"
-                  allowFullScreen
-                  loading="lazy"
-                  style={{ border: 0, display: "block", borderRadius: "5px", flex: 1, minWidth: 0 }}
-                />
-              ))}
-            </div>
             <a
               href={APPLE_URL}
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                alignSelf: "center",
-                padding: "11px 28px",
+                padding: "10px 26px",
                 borderRadius: "4px",
                 background: "linear-gradient(180deg, #14110b 0%, #0a0806 100%)",
-                border: "1px solid rgba(201,168,76,0.38)",
+                border: "1px solid rgba(201,168,76,0.42)",
                 color: "#e8c56a",
                 textDecoration: "none",
-                fontSize: "14px",
+                fontSize: "12px",
                 fontWeight: 600,
-                letterSpacing: "0.3em",
+                letterSpacing: "0.25em",
                 textTransform: "uppercase",
               }}
             >

@@ -41,11 +41,10 @@ export default function GalleryLight({ isActive, width }: GalleryLightProps) {
   const bulbMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const haloInnerRef = useRef<THREE.MeshBasicMaterial>(null);
   const haloOuterRef = useRef<THREE.MeshBasicMaterial>(null);
-  const coneMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const spillMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
   // Reused color buffers for the bulb color interpolation.
-  const bulbColorActive = useMemo(() => new THREE.Color("#fff4d0"), []);
+  const bulbColorActive = useMemo(() => new THREE.Color("#e6c48a"), []);
   const bulbColorIdle = useMemo(() => new THREE.Color("#4a3a18"), []);
   const bulbColorBuf = useMemo(() => new THREE.Color(), []);
 
@@ -57,16 +56,15 @@ export default function GalleryLight({ isActive, width }: GalleryLightProps) {
     const L = lightLevel.current;
 
     if (barMatRef.current) {
-      barMatRef.current.emissiveIntensity = 0.04 + L * 0.22;
+      barMatRef.current.emissiveIntensity = 0.02 + L * 0.1;
     }
     if (bulbMatRef.current) {
       bulbColorBuf.copy(bulbColorIdle).lerp(bulbColorActive, L);
       bulbMatRef.current.color.copy(bulbColorBuf);
     }
-    if (haloInnerRef.current) haloInnerRef.current.opacity = L * 0.55;
-    if (haloOuterRef.current) haloOuterRef.current.opacity = L * 0.2;
-    if (coneMatRef.current) coneMatRef.current.opacity = L * 0.08;
-    if (spillMatRef.current) spillMatRef.current.opacity = L * 0.4;
+    if (haloInnerRef.current) haloInnerRef.current.opacity = L * 0.28;
+    if (haloOuterRef.current) haloOuterRef.current.opacity = L * 0.1;
+    if (spillMatRef.current) spillMatRef.current.opacity = L * 0.2;
   });
 
   return (
@@ -158,20 +156,6 @@ export default function GalleryLight({ isActive, width }: GalleryLightProps) {
         />
       </mesh>
 
-      {/* Short light-shaft cone */}
-      <mesh position={[0, -0.12, barProtrusion]}>
-        <coneGeometry args={[0.1, 0.2, 24, 1, true]} />
-        <meshBasicMaterial
-          ref={coneMatRef}
-          color="#ffd080"
-          transparent
-          opacity={0}
-          depthWrite={false}
-          toneMapped={false}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
     </group>
   );
 }

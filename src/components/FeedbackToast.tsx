@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 // Tweak these to taste
-const TRIGGER_DELAY_MS = 30_000;            // show after 30s on the site
+const TRIGGER_DELAY_MS = 15_000;            // show after 15s on the site
 const SESSION_KEY = "coachb_feedback_seen"; // one popup per session
 
 // Formspree / Getform endpoint. Set in .env.local as:

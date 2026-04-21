@@ -273,9 +273,11 @@ export default function WallArtwork({
       </group>
       )}
 
-      {/* Gallery picture light — above the frame (hidden for decoys) */}
+      {/* Gallery picture light — above the frame (hidden for decoys).
+          Offset is tuned so the outer halo (r=0.08) sits fully above the frame
+          top, i.e. no additive overlay bleeds onto the art when the light is on. */}
       {!noLight && (
-        <group position={[0, (hasFrameTexture ? frameH / 2 : height / 2) + 0.08, 0.01]}>
+        <group position={[0, (hasFrameTexture ? frameH / 2 : height / 2) + 0.13, 0.01]}>
           <GalleryLight isActive={isActive} width={hasFrameTexture ? frameW : width} />
         </group>
       )}

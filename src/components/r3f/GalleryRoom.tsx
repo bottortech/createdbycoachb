@@ -149,7 +149,7 @@ const ARTWORKS: ArtworkDef[] = [
       description: "Visual graphics and branding for JB TV.",
       tags: ["Graphics", "Branding", "Identity"] }},
   { position: [9, 1.9, GZ - GW], rotation: [0, 0, 0], width: 1.1, frame: "landscape",
-    project: { title: "RetroRack.app", category: "Web Application", image: "/images/retrorack-web-app.jpg",
+    project: { title: "RetroRack", category: "Web Application", image: "/images/retrorack-web-app.jpg",
       description: "A web based platform for collecting, organizing, and showcasing retro tech.",
       tags: ["Web App", "React", "Full Stack"], link: "https://retrorack.app/", linkLabel: "Visit RetroRack" }},
   { position: [11.5, 1.9, GZ - GW], rotation: [0, 0, 0], width: 1.0, frame: "landscape",
@@ -330,6 +330,12 @@ interface GalleryRoomProps {
   onPortalEnter?: () => void;
   portalActive?: boolean;
   portalOverride?: { pos: [number, number, number]; lookAt: [number, number, number] } | null;
+  /** Direct A→B camera lerp that bypasses STOPS-axis interpolation. Used for
+   * vault-to-vault jumps so the camera doesn't swing through intermediate
+   * gallery stops. Target idx is used to sync smoothProgress when the lerp
+   * finishes, so the STOPS path resumes cleanly at the new stop. */
+  directSnap?: { pos: [number, number, number]; lookAt: [number, number, number]; targetIdx: number } | null;
+  onDirectSnapDone?: () => void;
   onPortalProximityChange?: (ready: boolean) => void;
   freeLook?: boolean;
 }
@@ -350,6 +356,8 @@ export default function GalleryRoom({
   onPortalEnter,
   portalActive = false,
   portalOverride = null,
+  directSnap = null,
+  onDirectSnapDone,
   onPortalProximityChange,
   freeLook = false,
 }: GalleryRoomProps) {
@@ -374,6 +382,12 @@ export default function GalleryRoom({
   const overrideInitialized = useRef(false);
   const overrideTargetPos = useRef(new THREE.Vector3());
   const overrideTargetLook = useRef(new THREE.Vector3());
+
+  // Direct-snap override — one-shot A→B lerp seeded from live camera, released
+  // when the camera reaches the target.
+  const directSmoothPos = useRef(new THREE.Vector3());
+  const directSmoothLook = useRef(new THREE.Vector3());
+  const directInitialized = useRef(false);
 
   // Portal proximity — computed each frame, reported up when it crosses the threshold
   const portalPaintingVec = useRef(new THREE.Vector3(...PORTAL_PAINTING_POS));
@@ -488,6 +502,37 @@ export default function GalleryRoom({
       return;
     }
     overrideInitialized.current = false;
+
+    // --- Direct-snap override: one-shot direct A→B lerp (vault-to-vault jumps)
+    if (directSnap) {
+      if (!directInitialized.current) {
+        directInitialized.current = true;
+        directSmoothPos.current.copy(camera.position);
+        camera.getWorldDirection(_v3a);
+        directSmoothLook.current.copy(camera.position).add(_v3a.multiplyScalar(2));
+      }
+      _v3a.set(...directSnap.pos);
+      _v3b.set(...directSnap.lookAt);
+      const rate = 4.5;
+      const k = 1 - Math.exp(-rate * dt);
+      directSmoothPos.current.lerp(_v3a, k);
+      directSmoothLook.current.lerp(_v3b, k * 1.2);
+      camera.position.copy(directSmoothPos.current);
+      camera.lookAt(directSmoothLook.current);
+
+      if (camera.position.distanceTo(_v3a) < 0.015) {
+        // Sync STOPS-space to the landing idx so the main path resumes here
+        // without a second jump.
+        smoothProgress.current = directSnap.targetIdx;
+        smoothLook.current = directSnap.targetIdx;
+        directInitialized.current = false;
+        onDirectSnapDone?.();
+      }
+      onProgressChange(Math.min(1, directSnap.targetIdx / TOUR_LAST));
+      onLabelChange(STOPS[directSnap.targetIdx]?.label ?? "");
+      return;
+    }
+    directInitialized.current = false;
 
     const target = targetRef.current;
 
@@ -626,8 +671,8 @@ export default function GalleryRoom({
       {/* Service pedestals — row across end of gallery */}
       <ConnectPedestal position={[17.5, 0, GZ + 1.2]} onClick={() => onOpenPanel?.("connect")} />
       <DiamondPedestal position={[17.5, 0, GZ + 0.4]} onClick={() => onOpenPanel?.("enterprise")} />
-      <EnvelopePedestal position={[17.5, 0, GZ - 0.4]} onClick={() => onOpenPanel?.("contact")} />
-      <PhonePedestal position={[17.5, 0, GZ - 1.2]} onClick={() => onOpenPanel?.("book")} />
+      <EnvelopePedestal position={[17.5, 0, GZ - 0.4]} onClick={() => onOpenPanel?.("commission")} />
+      <PhonePedestal position={[17.5, 0, GZ - 1.2]} onClick={() => onOpenPanel?.("appointments")} />
 
       {/* Artworks */}
       {ARTWORKS.map((art) => {

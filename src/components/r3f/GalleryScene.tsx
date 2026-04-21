@@ -1,6 +1,6 @@
 "use client";
 
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -15,124 +15,18 @@ type PanelType = "enterprise" | "studio" | "appointments" | "commission" | "conn
 // Max stop user can reach via scroll/arrows. Vault case stops live past PORTAL_STOP
 // but are only addressable via the TechVaultMap, not by scrolling.
 const LAST = PORTAL_STOP;
-const DEFAULT_SPEED = 0.5;
 const PORTAL_ANIM_MS = 1500;
 
-/* ------------------------------------------------------------------ */
-/*  TourController — frame-synced auto-tour with delta-time drift      */
-/* ------------------------------------------------------------------ */
-
-function TourController({
-  targetRef, syncTarget, snapRef, autoSpeed,
-  entered, autoTour, anyOverlayOpen, loopResetFlag,
-}: {
-  targetRef: { current: number };
-  syncTarget: (v: number) => void;
-  snapRef: { current: boolean };
-  autoSpeed: number;
-  entered: boolean;
-  autoTour: boolean;
-  anyOverlayOpen: boolean;
-  loopResetFlag: { current: boolean };
-}) {
-  const stopIdx = useRef(0);
-  const holdTime = useRef(0);
-  const phase = useRef<"drift" | "pause">("pause");
-  const syncTimer = useRef(0);
-  const wasActive = useRef(false);
-
-  useFrame((_, rawDelta) => {
-    const isActive = entered && autoTour && !anyOverlayOpen;
-
-    if (!isActive) {
-      wasActive.current = false;
-      return;
-    }
-
-    // Just became active — resume from current position (but never past the tour's last stop)
-    if (!wasActive.current) {
-      wasActive.current = true;
-      const current = targetRef.current;
-      stopIdx.current = Math.min(Math.round(current), TOUR_LAST);
-      holdTime.current = 0;
-      phase.current = "pause";
-      targetRef.current = stopIdx.current;
-      syncTarget(stopIdx.current);
-      return;
-    }
-
-    const dt = Math.min(rawDelta, 0.1); // clamp for tab-refocus safety
-
-    // Loop restart
-    if (loopResetFlag.current) {
-      loopResetFlag.current = false;
-      stopIdx.current = 0;
-      holdTime.current = 0;
-      phase.current = "pause";
-      targetRef.current = 0;
-      syncTarget(0);
-      return;
-    }
-
-    if (phase.current === "pause") {
-      holdTime.current += dt;
-      targetRef.current = Math.max(0, Math.min(TOUR_LAST, stopIdx.current));
-      snapRef.current = true;
-
-      // Hold timing (seconds) — matches original 50ms-tick pacing exactly
-      const tier = STOPS[stopIdx.current]?.tier || 3;
-      const isFirst = stopIdx.current === 0;
-      const isGoat = STOPS[stopIdx.current]?.label === "The Standard";
-      const isServices = STOPS[stopIdx.current]?.label === "Services";
-
-      const settleTime = isFirst ? 0.4 : isServices ? 0.75 : isGoat ? 2.5 : 1.0;
-      const holdDuration = isFirst ? 2.6 : isServices ? 2.0 : isGoat ? 2.5
-        : (tier === 1 ? 1.75 : tier === 2 ? 2.0 : 1.5);
-
-      if (holdTime.current >= settleTime + holdDuration) {
-        holdTime.current = 0;
-        snapRef.current = false;
-        stopIdx.current++;
-
-        if (stopIdx.current > TOUR_LAST) {
-          stopIdx.current = TOUR_LAST;
-          phase.current = "pause";
-        } else if (stopIdx.current === TOUR_LAST) {
-          targetRef.current = TOUR_LAST;
-          phase.current = "pause";
-        } else {
-          phase.current = "drift";
-        }
-      }
-    } else {
-      // Smooth drift — advances every render frame using delta time
-      const current = targetRef.current;
-      const goal = stopIdx.current;
-      const from = goal - 1;
-      const segmentProgress = Math.max(0, Math.min(1, (current - from) / (goal - from)));
-
-      // Subtle ease-in-out: camera gently accelerates then decelerates each segment
-      const ease = 1 - 0.1 * Math.cos(segmentProgress * Math.PI);
-      const segmentSpeed = goal === 1 ? autoSpeed * 1.5 : autoSpeed; // first turn is faster
-      const next = current + segmentSpeed * ease * dt;
-
-      if (next >= goal - 0.02) {
-        targetRef.current = goal;
-        phase.current = "pause";
-      } else {
-        targetRef.current = Math.min(next, goal);
-      }
-    }
-
-    // Sync React state for progress bar (~15fps, avoids excessive re-renders)
-    syncTimer.current += dt;
-    if (syncTimer.current > 0.066) {
-      syncTimer.current = 0;
-      syncTarget(targetRef.current);
-    }
-  });
-
-  return null;
+// Guided tour dwell — how long to sit at each stop AFTER the camera has fully
+// settled. Anchor stops get a longer beat; regular tier-based stops scale.
+// Tech Vault doorway is a pass-through waypoint in guided mode (the tour flies
+// straight into the vault cases from there), so it gets the shortest dwell.
+function guidedDwellMs(stop: (typeof STOPS)[number]): number {
+  if (stop.label === "WiggleWoo's Word Quest") return 2600;
+  if (stop.label === "The Standard") return 2500;
+  if (stop.label === "Services") return 2000;
+  if (stop.label === "Tech Vault") return 150;
+  return stop.tier === 1 ? 1750 : stop.tier === 2 ? 2000 : 1500;
 }
 
 export default function GalleryScene() {
@@ -140,20 +34,26 @@ export default function GalleryScene() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [activePanel, setActivePanel] = useState<PanelType>(null);
   const [musicPlaying, setMusicPlaying] = useState(false);
-  // Auto-tour is disabled for now — starts in manual mode.
+  // Starts in manual; user opts into guided via the map or toggle.
   const [mode, setMode] = useState<"guided" | "manual">("manual");
-  // Flip to true to re-enable auto-tour UI (Continue Auto Tour, Guided toggle,
-  // Start Auto Tour button). Everything that drives auto-tour still exists
-  // under the hood — this just hides the entry points.
-  const AUTO_TOUR_ENABLED = false;
+  const AUTO_TOUR_ENABLED = true;
   const [progress, setProgress] = useState(0);
   const [currentLabel, setCurrentLabel] = useState("Entrance");
-  const [autoSpeed, setAutoSpeed] = useState(DEFAULT_SPEED);
   const [mapOpen, setMapOpen] = useState(false);
   const [portalStage, setPortalStage] = useState<"none" | "entering" | "inside" | "exiting">("none");
   const [portalReady, setPortalReady] = useState(false);
-  const mapAutoShown = useRef(false);
-  const loopResetFlag = useRef(false);
+  // Active direct A→B camera override — used for vault-to-vault jumps so the
+  // camera flies straight between two vault stops instead of sweeping through
+  // every gallery stop between them on the STOPS index axis.
+  const [directSnap, setDirectSnap] = useState<{
+    pos: [number, number, number];
+    lookAt: [number, number, number];
+    targetIdx: number;
+  } | null>(null);
+  // Guided tour pauses at the Tech Vault doorway so the user can choose whether
+  // to enter the vault and tour each glass display, or skip straight to the
+  // next gallery piece.
+  const [vaultPromptOpen, setVaultPromptOpen] = useState(false);
 
   const autoTour = mode === "guided";
   const setAutoTour = useCallback((v: boolean) => setMode(v ? "guided" : "manual"), []);
@@ -208,78 +108,181 @@ export default function GalleryScene() {
     };
   }, [entered, musicPlaying]);
 
-  const restartTour = useCallback(() => {
-    updateTarget(1); // go to Main Gallery view
+  const mainGalleryStopIdx = useMemo(
+    () => STOPS.findIndex((s) => s.label === "Main Gallery"),
+    []
+  );
+  const techVaultDoorwayIdx = useMemo(
+    () => STOPS.findIndex((s) => s.label === "Tech Vault"),
+    []
+  );
+
+  // Guided tour stop sequence. The vault cases aren't adjacent to the gallery
+  // stops in the STOPS array, so the tour visits them as a detour right after
+  // the Tech Vault doorway peek. Snake order across the cases (back row L→R,
+  // then front row R→L) so the camera doesn't jog across the vault.
+  const GUIDED_SEQUENCE = useMemo<number[]>(() => {
+    const vaultOrder = [0, 1, 2, 6, 5, 4, 3].map((o) => VAULT_CASE_START + o);
+    const seq: number[] = [];
+    for (let i = 0; i <= TOUR_LAST; i++) {
+      seq.push(i);
+      if (i === techVaultDoorwayIdx) seq.push(...vaultOrder);
+    }
+    return seq;
+  }, [techVaultDoorwayIdx]);
+
+  // True when a stop→stop transition would otherwise detour through unrelated
+  // positions on the STOPS index axis (e.g. doorway idx 2 → vault case idx 16
+  // would visit every gallery stop between them). Non-adjacent stops get a
+  // direct A→B camera lerp instead.
+  const transitionNeedsDirectSnap = useCallback(
+    (fromIdx: number, toIdx: number) => Math.abs(fromIdx - toIdx) > 1,
+    []
+  );
+
+  // Shared navigation — the single, reusable "move the camera to stop N"
+  // function. Both manual map clicks and the guided state machine call this;
+  // neither has its own movement path. Mode changes are the caller's job.
+  const goToStop = useCallback((index: number) => {
+    updateTarget(index);
     snapRef.current = true;
-    setMode("manual"); // hand control to the user after one loop
-    mapAutoShown.current = false;
-    setMapOpen(true); // open map so user can browse
   }, [updateTarget]);
 
-  // LOOP RULE: Only loop when camera has ACTUALLY arrived at the book (progress >= 0.95)
-  // AND stayed there for 5 seconds
-  const atBookTimer = useRef(0);
-  const loopTriggered = useRef(false);
-  const progressRef = useRef(0);
-
-  // Keep progressRef in sync
-  useEffect(() => { progressRef.current = progress; }, [progress]);
-
-  useEffect(() => {
-    if (!entered || !autoTour) {
-      atBookTimer.current = 0;
-      loopTriggered.current = false;
-      return;
+  // Same as goToStop, but picks the direct A→B lerp path when the jump would
+  // cause a detour through unrelated STOPS-axis positions. Used by both manual
+  // vault clicks and the guided state machine.
+  const navigateToStop = useCallback((destIdx: number) => {
+    const currentIdx = Math.round(targetRef.current);
+    if (transitionNeedsDirectSnap(currentIdx, destIdx)) {
+      const dest = STOPS[destIdx];
+      updateTarget(destIdx);
+      snapRef.current = false;
+      setDirectSnap({ pos: dest.pos, lookAt: dest.lookAt, targetIdx: destIdx });
+    } else {
+      goToStop(destIdx);
     }
-
-    const check = setInterval(() => {
-      if (progressRef.current >= 0.95) {
-        atBookTimer.current += 100;
-
-        // Close the gallery map 1 second before the loop triggers
-        if (atBookTimer.current >= 4000 && mapOpen) {
-          setMapOpen(false);
-        }
-
-        if (atBookTimer.current >= 5000 && !loopTriggered.current) {
-          loopTriggered.current = true;
-          restartTour();
-          setTimeout(() => {
-            atBookTimer.current = 0;
-            loopTriggered.current = false;
-          }, 2000);
-        }
-      } else {
-        atBookTimer.current = 0;
-      }
-    }, 100);
-
-    return () => clearInterval(check);
-  }, [entered, autoTour, restartTour]);
-
-  // After the first auto-tour transition (stop 0 → stop 1), drop into manual
-  // mode and open the map so the user decides whether to resume guided.
-  useEffect(() => {
-    if (currentLabel === "Main Gallery" && !mapAutoShown.current && autoTour && entered) {
-      mapAutoShown.current = true;
-      setMapOpen(true);
-      setMode("manual");
-    }
-  }, [currentLabel, autoTour, entered]);
-
-  // Reset auto-show flag when tour loops back so map shows each loop
-  useEffect(() => {
-    if (currentLabel === "WiggleWoo's Word Quest") {
-      mapAutoShown.current = false;
-    }
-  }, [currentLabel]);
+  }, [goToStop, updateTarget, transitionNeedsDirectSnap]);
 
   // Handle map piece selection
   const handleMapSelect = useCallback((stopIndex: number) => {
     setMode("manual");
-    updateTarget(stopIndex);
-    snapRef.current = true;
-  }, [updateTarget]);
+    navigateToStop(stopIndex);
+  }, [navigateToStop]);
+
+  // Guided state machine. Drives the tour by calling navigateToStop step by
+  // step (same movement paths manual uses — STOPS lerp for adjacent stops,
+  // direct A→B lerp for vault entry/exit). Waits for the camera to fully
+  // settle at each stop (signalled by handleSnapDone or handleDirectSnapDone
+  // → guidedSettleHandler), then dwells, then advances.
+  const guidedSeqIdx = useRef(0);
+  const guidedDwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const guidedSettleHandler = useRef<(() => void) | null>(null);
+  // Set when the tour is paused at the Tech Vault doorway waiting for the user
+  // to pick "enter" or "skip". Cleared on resolution (or on cleanup).
+  const guidedResumer = useRef<((choice: "enter" | "skip") => void) | null>(null);
+
+  const consumeSettleHandler = useCallback(() => {
+    const fn = guidedSettleHandler.current;
+    if (fn) {
+      guidedSettleHandler.current = null;
+      fn();
+    }
+  }, []);
+
+  // Fires when GalleryRoom finishes a STOPS-axis snap.
+  const handleSnapDone = useCallback(() => {
+    snapRef.current = false;
+    consumeSettleHandler();
+  }, [consumeSettleHandler]);
+
+  // Fires when GalleryRoom finishes a direct A→B lerp (vault entry/exit/hop).
+  const handleDirectSnapDone = useCallback(() => {
+    setDirectSnap(null);
+    consumeSettleHandler();
+  }, [consumeSettleHandler]);
+
+  useEffect(() => {
+    const guidedActive = entered && autoTour && !anyOverlayOpen && !portalActive;
+    if (!guidedActive) return;
+
+    // Find our position in the guided sequence. If the current stop isn't in
+    // the sequence (e.g. sitting at the portal approach stop) or we're at the
+    // end, start fresh from sequence[0].
+    const currentStopIdx = Math.max(0, Math.round(targetRef.current));
+    const seqIdxFromCurrent = GUIDED_SEQUENCE.indexOf(currentStopIdx);
+    const wasAtEndOrUnknown =
+      seqIdxFromCurrent < 0 || seqIdxFromCurrent >= GUIDED_SEQUENCE.length - 1;
+    guidedSeqIdx.current = wasAtEndOrUnknown ? 0 : seqIdxFromCurrent;
+
+    const scheduleDwell = () => {
+      const stopIdx = GUIDED_SEQUENCE[guidedSeqIdx.current];
+
+      // Tech Vault doorway — pause and let the user decide whether to enter
+      // the vault or skip straight to the next gallery piece. No timer; the
+      // tour resumes only when the user clicks a prompt button.
+      if (stopIdx === techVaultDoorwayIdx) {
+        setVaultPromptOpen(true);
+        guidedResumer.current = (choice) => {
+          setVaultPromptOpen(false);
+          guidedResumer.current = null;
+          if (choice === "enter") {
+            // Next sequence entry is the first vault case — advance normally.
+            advance();
+          } else {
+            // Jump past all vault cases in the sequence, then advance to the
+            // next gallery stop (Carla's).
+            guidedSeqIdx.current += VAULT_CASE_COUNT;
+            advance();
+          }
+        };
+        return;
+      }
+
+      const stop = STOPS[stopIdx];
+      guidedDwellTimer.current = setTimeout(() => {
+        guidedDwellTimer.current = null;
+        advance();
+      }, guidedDwellMs(stop));
+    };
+
+    const advance = () => {
+      const nextSeqIdx = guidedSeqIdx.current + 1;
+      if (nextSeqIdx >= GUIDED_SEQUENCE.length) {
+        // Tour complete — hand control back to the user.
+        setMode("manual");
+        setMapOpen(true);
+        return;
+      }
+      guidedSeqIdx.current = nextSeqIdx;
+      guidedSettleHandler.current = scheduleDwell;
+      navigateToStop(GUIDED_SEQUENCE[nextSeqIdx]);
+    };
+
+    // Kick off. If we had to reset (user was at the tour end / unknown stop),
+    // fly to the first stop and dwell there so they see it. If we're already
+    // sitting at the Tech Vault doorway (e.g. prompt was interrupted by an
+    // overlay), re-open the prompt rather than auto-advancing into the vault.
+    // Otherwise skip the initial dwell and move to the next stop immediately.
+    const startStopIdx = GUIDED_SEQUENCE[guidedSeqIdx.current];
+    if (wasAtEndOrUnknown) {
+      guidedSettleHandler.current = scheduleDwell;
+      navigateToStop(startStopIdx);
+    } else if (startStopIdx === techVaultDoorwayIdx) {
+      scheduleDwell();
+    } else {
+      advance();
+    }
+
+    return () => {
+      if (guidedDwellTimer.current) {
+        clearTimeout(guidedDwellTimer.current);
+        guidedDwellTimer.current = null;
+      }
+      guidedSettleHandler.current = null;
+      guidedResumer.current = null;
+      setVaultPromptOpen(false);
+    };
+  }, [entered, autoTour, anyOverlayOpen, portalActive, navigateToStop, GUIDED_SEQUENCE, techVaultDoorwayIdx]);
 
   // Tech Vault state — user is "inside" the vault at the Tech Vault stop or any
   // of the hidden case stops. The case key (null or "backend"/"aicore"/...) is
@@ -289,23 +292,18 @@ export default function GalleryScene() {
   const currentCaseKey = currentLabel.startsWith("__vault_")
     ? currentLabel.replace("__vault_", "")
     : null;
-  const mainGalleryStopIdx = useMemo(
-    () => STOPS.findIndex((s) => s.label === "Main Gallery"),
-    []
-  );
   const handleVaultCaseSelect = useCallback(
     (caseIdx: number) => {
       setMode("manual");
-      updateTarget(VAULT_CASE_START + caseIdx);
-      snapRef.current = true;
+      navigateToStop(VAULT_CASE_START + caseIdx);
     },
-    [updateTarget]
+    [navigateToStop]
   );
   const handleVaultReturn = useCallback(() => {
     setMode("manual");
-    updateTarget(mainGalleryStopIdx);
-    snapRef.current = true;
-  }, [updateTarget, mainGalleryStopIdx]);
+    setDirectSnap(null);
+    navigateToStop(mainGalleryStopIdx);
+  }, [navigateToStop, mainGalleryStopIdx]);
 
   const toggleMusic = useCallback(() => {
     if (!audioRef.current) return;
@@ -318,10 +316,9 @@ export default function GalleryScene() {
     setEntered(true);
     audioRef.current?.play().catch(() => {});
     setMusicPlaying(true);
-    // Map slide-in timed so it finishes at the same moment the intro fade
-    // completes — WiggleWoo becomes fully visible as the map lands.
-    // Intro fade = 500ms, map slide = 350ms → delay 150ms so both end at 500ms.
-    setTimeout(() => setMapOpen(true), 150);
+    // Hold the map off until WiggleWoo has fully popped in after the intro
+    // fade (500ms fade + a ~400ms beat for the piece to read on screen).
+    setTimeout(() => setMapOpen(true), 900);
   }, []);
 
   // Fade helper — ramps a single audio element to targetVol over durationMs
@@ -497,16 +494,6 @@ export default function GalleryScene() {
           if (portalStage === "inside") handlePortalExit();
         }}
       >
-        <TourController
-          targetRef={targetRef}
-          syncTarget={setTarget}
-          snapRef={snapRef}
-          autoSpeed={autoSpeed}
-          entered={entered}
-          autoTour={autoTour}
-          anyOverlayOpen={anyOverlayOpen || portalActive}
-          loopResetFlag={loopResetFlag}
-        />
         <Suspense fallback={null}>
           <GalleryRoom
             onSelectProject={setSelectedProject}
@@ -516,17 +503,15 @@ export default function GalleryScene() {
             autoTour={autoTour && entered && !anyOverlayOpen && !portalActive}
             cameraDisabled={false}
             snapping={snapRef.current}
-            onSnapDone={() => { snapRef.current = false; }}
+            onSnapDone={handleSnapDone}
             onProgressChange={setProgress}
             onLabelChange={setCurrentLabel}
             onOpenPanel={(panel) => setActivePanel(panel as PanelType)}
-            onRestartLoop={() => {
-              updateTarget(0);
-              snapRef.current = false;
-            }}
             onPortalEnter={handlePortalEnter}
             portalActive={portalActive}
             portalOverride={portalOverride}
+            directSnap={directSnap}
+            onDirectSnapDone={handleDirectSnapDone}
             onPortalProximityChange={setPortalReady}
             freeLook={portalStage === "inside"}
           />
@@ -619,6 +604,44 @@ export default function GalleryScene() {
             Exit Room
             <span className="hidden md:inline text-gallery-muted/60 ml-1">· Esc</span>
           </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Tech Vault prompt — guided tour pauses at the doorway for the user to
+          choose: tour each glass display, or skip to the next piece. */}
+      <AnimatePresence>
+        {vaultPromptOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed top-16 left-1/2 z-40 w-[280px] -translate-x-1/2 rounded-xl border border-gallery-accent/30 bg-[#0c0a08]/95 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          >
+            <div className="mb-1 text-[9px] font-medium uppercase tracking-[0.3em] text-gallery-accent">
+              Tech Vault
+            </div>
+            <h3 className="mb-2 text-[13px] font-medium text-gallery-white">
+              Take a closer look?
+            </h3>
+            <p className="mb-3 text-[11px] leading-relaxed text-gallery-muted">
+              Step inside to tour each glass display, or continue to the next gallery piece.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => guidedResumer.current?.("enter")}
+                className="flex-1 rounded-md bg-gallery-accent py-2 text-[10px] font-medium uppercase tracking-[0.18em] text-gallery-black transition-colors hover:bg-gallery-accent/90"
+              >
+                Enter Vault
+              </button>
+              <button
+                onClick={() => guidedResumer.current?.("skip")}
+                className="flex-1 rounded-md border border-white/15 bg-white/[0.03] py-2 text-[10px] font-medium uppercase tracking-[0.18em] text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+              >
+                Skip
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
