@@ -85,8 +85,8 @@ function TourController({
       const isGoat = STOPS[stopIdx.current]?.label === "The Standard";
       const isServices = STOPS[stopIdx.current]?.label === "Services";
 
-      const settleTime = isFirst ? 0.15 : isServices ? 0.75 : isGoat ? 2.5 : 1.0;
-      const holdDuration = isFirst ? 0.8 : isServices ? 2.0 : isGoat ? 2.5
+      const settleTime = isFirst ? 0.4 : isServices ? 0.75 : isGoat ? 2.5 : 1.0;
+      const holdDuration = isFirst ? 2.6 : isServices ? 2.0 : isGoat ? 2.5
         : (tier === 1 ? 1.75 : tier === 2 ? 2.0 : 1.5);
 
       if (holdTime.current >= settleTime + holdDuration) {
@@ -140,7 +140,12 @@ export default function GalleryScene() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [activePanel, setActivePanel] = useState<PanelType>(null);
   const [musicPlaying, setMusicPlaying] = useState(false);
-  const [mode, setMode] = useState<"guided" | "manual">("guided");
+  // Auto-tour is disabled for now — starts in manual mode.
+  const [mode, setMode] = useState<"guided" | "manual">("manual");
+  // Flip to true to re-enable auto-tour UI (Continue Auto Tour, Guided toggle,
+  // Start Auto Tour button). Everything that drives auto-tour still exists
+  // under the hood — this just hides the entry points.
+  const AUTO_TOUR_ENABLED = false;
   const [progress, setProgress] = useState(0);
   const [currentLabel, setCurrentLabel] = useState("Entrance");
   const [autoSpeed, setAutoSpeed] = useState(DEFAULT_SPEED);
@@ -313,6 +318,10 @@ export default function GalleryScene() {
     setEntered(true);
     audioRef.current?.play().catch(() => {});
     setMusicPlaying(true);
+    // Map slide-in timed so it finishes at the same moment the intro fade
+    // completes — WiggleWoo becomes fully visible as the map lands.
+    // Intro fade = 500ms, map slide = 350ms → delay 150ms so both end at 500ms.
+    setTimeout(() => setMapOpen(true), 150);
   }, []);
 
   // Fade helper — ramps a single audio element to targetVol over durationMs
@@ -567,7 +576,9 @@ export default function GalleryScene() {
                 {musicPlaying ? <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0014 8.14v7.72A4.5 4.5 0 0016.5 12zM14 3.23v2.06A6.97 6.97 0 0121 12a6.97 6.97 0 01-7 6.71v2.06A9 9 0 0023 12 9 9 0 0014 3.23z" /></svg>
                 : <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M16.5 12A4.5 4.5 0 0014 8.14v2.12l2.45 2.45c.03-.2.05-.4.05-.71zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.92 8.92 0 0021 12a9 9 0 00-7-8.77v2.06A6.97 6.97 0 0121 12zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 003.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" /></svg>}
               </button>
-              <button onClick={() => { const next = mode === "guided" ? "manual" : "guided"; setMode(next); if (next === "manual") setMapOpen(true); }} className={`rounded-full px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.12em] transition-all border ${mode === "guided" ? "border-gallery-accent/40 text-gallery-accent bg-gallery-accent/10" : "border-white/20 text-gallery-light bg-white/5"}`}>{mode === "guided" ? "Guided" : "Manual"}</button>
+              {AUTO_TOUR_ENABLED && (
+                <button onClick={() => { const next = mode === "guided" ? "manual" : "guided"; setMode(next); if (next === "manual") setMapOpen(true); }} className={`rounded-full px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.12em] transition-all border ${mode === "guided" ? "border-gallery-accent/40 text-gallery-accent bg-gallery-accent/10" : "border-white/20 text-gallery-light bg-white/5"}`}>{mode === "guided" ? "Guided" : "Manual"}</button>
+              )}
             </div>
           </div>
         </motion.div>
@@ -583,8 +594,8 @@ export default function GalleryScene() {
         </div>
       )}
 
-      {/* Manual mode — return to guided button */}
-      {entered && mode === "manual" && !anyOverlayOpen && !portalActive && (
+      {/* Manual mode — return to guided button (hidden while auto-tour is disabled) */}
+      {AUTO_TOUR_ENABLED && entered && mode === "manual" && !anyOverlayOpen && !portalActive && (
         <button
           onClick={() => setMode("guided")}
           className="fixed top-14 right-4 z-20 rounded-full border border-gallery-accent/30 bg-black/50 px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-gallery-accent backdrop-blur-sm transition-all hover:bg-gallery-accent hover:text-gallery-black"
@@ -622,6 +633,7 @@ export default function GalleryScene() {
           onSelectStop={handleMapSelect}
           onContinueTour={() => { setMode("guided"); }}
           currentLabel={currentLabel}
+          showContinueTour={AUTO_TOUR_ENABLED}
         />
       )}
       {!portalActive && insideVault && (

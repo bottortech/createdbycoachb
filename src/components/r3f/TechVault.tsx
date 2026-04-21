@@ -446,13 +446,14 @@ export default function TechVault() {
         <boxGeometry args={[0.04, 2.6, 0.08]} />
         <meshStandardMaterial color="#8a6a2e" emissive="#c9a84c" emissiveIntensity={0.2} metalness={0.85} roughness={0.35} />
       </mesh>
-      {/* TECH VAULT banner above the door — PNG image facing into the gallery */}
-      <mesh position={[(DOOR_X_MIN + DOOR_X_MAX) / 2, 3.0, ALCOVE_Z_MAX + 0.015]}>
+      {/* TECH VAULT banner above the door — PNG image facing into the gallery.
+          Cutout rendering (alphaTest + no transparent) so "transparent" pixels
+          with black-baked RGB don't flicker or fringe the banner. */}
+      <mesh position={[(DOOR_X_MIN + DOOR_X_MAX) / 2, 3.0, ALCOVE_Z_MAX + 0.06]}>
         <planeGeometry args={[1.8, 1.2]} />
         <meshBasicMaterial
           map={bannerTex}
-          transparent
-          alphaTest={0.05}
+          alphaTest={0.5}
           toneMapped={false}
         />
       </mesh>

@@ -362,6 +362,12 @@ export default function GalleryRoom({
   const [focusedLabel, setFocusedLabel] = useState("");
   const smoothLook = useRef(0);
 
+  // Distance-aware map-snap state — rate is computed once per snap so the
+  // duration scales with how far the click jumps.
+  const wasSnapping = useRef(false);
+  const snapPosRate = useRef(8);
+  const snapLookRate = useRef(10);
+
   // Portal override — smooth lerp state (initialized from live camera on first use)
   const overrideSmoothPos = useRef(new THREE.Vector3());
   const overrideSmoothLook = useRef(new THREE.Vector3());
@@ -491,12 +497,23 @@ export default function GalleryRoom({
       smoothLook.current = target;
     }
 
-    // Frame-rate independent exponential lerp. Clamp dt so a brief frame
-    // hitch doesn't cause a big catch-up jump that reads as "chop".
-    const dtClamped = Math.min(dt, 0.05);
+    // Frame-rate independent exponential lerp
     const atStop = Math.abs(target - Math.round(target)) < 0.02;
-    const posRate = snapping ? 8 : (atStop ? 8 : 12);
-    const posLerp = 1 - Math.exp(-posRate * dtClamped);
+
+    // Distance-aware snap rate — computed once when a snap starts and held
+    // for the whole transition. Short jumps lerp quickly, long jumps take
+    // proportionally more time so they read as smooth cinematic pans.
+    if (snapping && !wasSnapping.current) {
+      const d = Math.abs(target - smoothProgress.current);
+      snapPosRate.current = Math.max(3.5, 10 - d * 0.6);
+      snapLookRate.current = Math.max(4.5, 12 - d * 0.7);
+      wasSnapping.current = true;
+    } else if (!snapping) {
+      wasSnapping.current = false;
+    }
+
+    const posRate = snapping ? snapPosRate.current : (atStop ? 8 : 25);
+    const posLerp = 1 - Math.exp(-posRate * dt);
     smoothProgress.current += (target - smoothProgress.current) * posLerp;
     if (Math.abs(smoothProgress.current - target) < 0.005) {
       smoothProgress.current = target;
@@ -504,8 +521,8 @@ export default function GalleryRoom({
     }
 
     // Look lerp — slightly faster than position for natural look-ahead
-    const lookRate = snapping ? 10 : (atStop ? 10 : 16);
-    const lookLerp = 1 - Math.exp(-lookRate * dtClamped);
+    const lookRate = snapping ? snapLookRate.current : (atStop ? 10 : 30);
+    const lookLerp = 1 - Math.exp(-lookRate * dt);
     smoothLook.current += (target - smoothLook.current) * lookLerp;
     if (Math.abs(smoothLook.current - target) < 0.005) smoothLook.current = target;
 

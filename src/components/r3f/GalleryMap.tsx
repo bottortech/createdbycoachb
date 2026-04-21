@@ -28,9 +28,11 @@ interface GalleryMapProps {
   onSelectStop: (index: number) => void;
   onContinueTour: () => void;
   currentLabel: string;
+  /** When false, hides the "Continue Auto Tour" buttons. Defaults to true. */
+  showContinueTour?: boolean;
 }
 
-export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour, currentLabel }: GalleryMapProps) {
+export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour, currentLabel, showContinueTour = true }: GalleryMapProps) {
   const pieces = STOPS.map((stop, i) => ({ ...stop, index: i })).filter(
     (s) => s.label !== "Main Gallery" && s.label !== "" && !s.label.startsWith("__")
   );
@@ -62,15 +64,17 @@ export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[9px] font-medium uppercase tracking-[0.3em] text-gallery-accent">Gallery Map</span>
-                  <p className="mt-0.5 text-[10px] text-gallery-muted">Jump to any piece or continue the tour</p>
+                  <p className="mt-0.5 text-[10px] text-gallery-muted">{showContinueTour ? "Jump to any piece or continue the tour" : "Jump to any piece"}</p>
                 </div>
-                <button onClick={onContinueTour} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-gallery-muted transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent">
+                <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-gallery-muted transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent">
                   <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
-              <button onClick={onContinueTour} className="mt-3 w-full rounded-lg bg-gallery-accent py-2.5 text-[10px] font-medium uppercase tracking-wider text-gallery-black transition-all hover:bg-gallery-accent/90">
-                Continue Auto Tour
-              </button>
+              {showContinueTour && (
+                <button onClick={onContinueTour} className="mt-3 w-full rounded-lg bg-gallery-accent py-2.5 text-[10px] font-medium uppercase tracking-wider text-gallery-black transition-all hover:bg-gallery-accent/90">
+                  Continue Auto Tour
+                </button>
+              )}
               {mainGalleryIdx >= 0 && (
                 <button
                   onClick={() => onSelectStop(mainGalleryIdx)}
@@ -122,9 +126,11 @@ export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour
           >
             {/* Continue button + Main Gallery + close */}
             <div className="flex items-center justify-between gap-2 bg-[#0c0a08]/95 px-3 py-2 backdrop-blur-xl border-t border-white/[0.06]">
-              <button onClick={onContinueTour} className="rounded-full bg-gallery-accent px-3 py-1.5 text-[9px] font-medium uppercase tracking-wider text-gallery-black">
-                Continue Tour
-              </button>
+              {showContinueTour && (
+                <button onClick={onContinueTour} className="rounded-full bg-gallery-accent px-3 py-1.5 text-[9px] font-medium uppercase tracking-wider text-gallery-black">
+                  Continue Tour
+                </button>
+              )}
               {mainGalleryIdx >= 0 && (
                 <button
                   onClick={() => onSelectStop(mainGalleryIdx)}
@@ -137,7 +143,7 @@ export default function GalleryMap({ open, onClose, onSelectStop, onContinueTour
                   Main Gallery
                 </button>
               )}
-              <button onClick={onContinueTour} className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-gallery-muted">
+              <button onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 text-gallery-muted">
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
