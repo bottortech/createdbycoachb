@@ -285,6 +285,11 @@ function GoatStatue({ position, onClick }: { position: [number, number, number];
 
 const _v3a = new THREE.Vector3();
 const _v3b = new THREE.Vector3();
+// Temp scratch for look-at → yaw/pitch math used by the music-room remote.
+const _lookMat = new THREE.Matrix4();
+const _lookQuat = new THREE.Quaternion();
+const _lookEuler = new THREE.Euler(0, 0, 0, "YXZ");
+const _upVec = new THREE.Vector3(0, 1, 0);
 
 function lerpStops(a: GalleryStop, b: GalleryStop, t: number, outPos: THREE.Vector3, outLook: THREE.Vector3) {
   _v3a.set(...a.pos); _v3b.set(...b.pos); outPos.lerpVectors(_v3a, _v3b, t);
@@ -338,6 +343,13 @@ interface GalleryRoomProps {
   onDirectSnapDone?: () => void;
   onPortalProximityChange?: (ready: boolean) => void;
   freeLook?: boolean;
+  /** World point the free-look camera should smoothly rotate to face. Used by
+   *  the music-room remote to steer between pieces. Null = free-drag only. */
+  musicRoomTargetLookAt?: [number, number, number] | null;
+  /** Power state forwarded to MusicRoom. */
+  musicRoomPower?: boolean;
+  /** Currently selected piece index forwarded to MusicRoom. */
+  musicRoomPieceIdx?: number;
 }
 
 export default function GalleryRoom({
@@ -360,6 +372,9 @@ export default function GalleryRoom({
   onDirectSnapDone,
   onPortalProximityChange,
   freeLook = false,
+  musicRoomTargetLookAt = null,
+  musicRoomPower = false,
+  musicRoomPieceIdx = 3,
 }: GalleryRoomProps) {
   const { camera } = useThree();
 
@@ -393,11 +408,37 @@ export default function GalleryRoom({
   const portalPaintingVec = useRef(new THREE.Vector3(...PORTAL_PAINTING_POS));
   const portalReadyState = useRef(false);
 
+  // Mobile detection — used only to tweak the Services stop framing so all 4
+  // pedestals fit on narrow viewports. Desktop behavior is untouched.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const servicesIdx = useMemo(
+    () => STOPS.findIndex((s) => s.label === "Services"),
+    []
+  );
+
   // Free-look (music room) — yaw/pitch driven by mouse drag
   const yawRef = useRef(Math.PI); // Math.PI = facing +z by default (music-room start orientation)
   const pitchRef = useRef(0);
   const freeLookSeeded = useRef(false);
   const freeLookEuler = useRef(new THREE.Euler(0, 0, 0, "YXZ"));
+
+  // Music-room remote: true while we should be lerping yaw/pitch toward
+  // musicRoomTargetLookAt. Reset to true whenever the user clicks a new
+  // piece (pieceIdx changes), turned off the moment the user starts a
+  // manual drag so their input isn't fighting the lerp.
+  const remoteLerpActive = useRef(false);
+  const draggingRef = useRef(false);
+  useEffect(() => {
+    remoteLerpActive.current = true;
+  }, [musicRoomPieceIdx]);
 
   const wallTex = useTexture("/images/gallery/wall.jpg");
   const floorTex = useTexture("/images/gallery/floor.jpg");
@@ -427,6 +468,10 @@ export default function GalleryRoom({
       const target = e.target as HTMLElement;
       if (target.closest("iframe") || target.closest("a")) return;
       dragging = true;
+      draggingRef.current = true;
+      // Manual drag takes over — stop lerping toward the remote's target
+      // until the user picks a new piece.
+      remoteLerpActive.current = false;
       lastX = e.clientX;
       lastY = e.clientY;
       document.body.style.cursor = "grabbing";
@@ -442,6 +487,7 @@ export default function GalleryRoom({
     };
     const onUp = () => {
       dragging = false;
+      draggingRef.current = false;
       document.body.style.cursor = "grab";
     };
 
@@ -490,6 +536,31 @@ export default function GalleryRoom({
           yawRef.current = freeLookEuler.current.y;
           pitchRef.current = freeLookEuler.current.x;
         }
+
+        // Music-room remote: lerp toward the selected piece's look-at while
+        // the user isn't actively dragging and hasn't dragged since the last
+        // arrow click.
+        if (
+          musicRoomTargetLookAt &&
+          remoteLerpActive.current &&
+          !draggingRef.current
+        ) {
+          _v3a.set(...musicRoomTargetLookAt);
+          _lookMat.lookAt(camera.position, _v3a, _upVec);
+          _lookQuat.setFromRotationMatrix(_lookMat);
+          _lookEuler.setFromQuaternion(_lookQuat, "YXZ");
+          const targetYaw = _lookEuler.y;
+          const targetPitch = _lookEuler.x;
+          // Shortest-path yaw delta so the camera never spins the long way.
+          let dYaw = targetYaw - yawRef.current;
+          while (dYaw > Math.PI) dYaw -= 2 * Math.PI;
+          while (dYaw < -Math.PI) dYaw += 2 * Math.PI;
+          const rate = 5;
+          const k = 1 - Math.exp(-rate * dt);
+          yawRef.current += dYaw * k;
+          pitchRef.current += (targetPitch - pitchRef.current) * k;
+        }
+
         freeLookEuler.current.set(pitchRef.current, yawRef.current, 0, "YXZ");
         camera.quaternion.setFromEuler(freeLookEuler.current);
       } else {
@@ -513,6 +584,12 @@ export default function GalleryRoom({
       }
       _v3a.set(...directSnap.pos);
       _v3b.set(...directSnap.lookAt);
+      // Mobile framing adjustment for Services — pull camera back + up so
+      // all 4 pedestals fit the narrow viewport (lookAt stays the same).
+      if (isMobile && directSnap.targetIdx === servicesIdx) {
+        _v3a.x -= 1.5;
+        _v3a.y += 0.4;
+      }
       const rate = 4.5;
       const k = 1 - Math.exp(-rate * dt);
       directSmoothPos.current.lerp(_v3a, k);
@@ -574,6 +651,18 @@ export default function GalleryRoom({
     // Camera position
     getCamera(smoothProgress.current, camPos.current, camLook.current);
     camera.position.copy(camPos.current);
+
+    // Mobile framing adjustment for Services — blend a pull-back + rise as the
+    // camera approaches the stop so all 4 pedestals fit on narrow viewports.
+    // Desktop path is skipped entirely.
+    if (isMobile && servicesIdx >= 0) {
+      const d = Math.abs(smoothProgress.current - servicesIdx);
+      if (d < 1) {
+        const weight = 1 - d;
+        camera.position.x -= 1.5 * weight;
+        camera.position.y += 0.4 * weight;
+      }
+    }
 
     // Micro drift during hold — very subtle breathing motion
     const moveDelta = Math.abs(target - smoothProgress.current);
@@ -699,7 +788,13 @@ export default function GalleryRoom({
       })}
 
       {/* Hidden Music Room — only mounted once the portal has been triggered */}
-      {portalActive && <MusicRoom onOpenPanel={onOpenPanel} />}
+      {portalActive && (
+        <MusicRoom
+          onOpenPanel={onOpenPanel}
+          powerOn={musicRoomPower}
+          currentPieceIdx={musicRoomPieceIdx}
+        />
+      )}
 
       {/* Tech Vault — dedicated alcove branching off the top wall at x=3..4 */}
       <TechVault />

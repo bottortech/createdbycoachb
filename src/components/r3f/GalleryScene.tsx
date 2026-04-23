@@ -17,6 +17,23 @@ type PanelType = "enterprise" | "studio" | "appointments" | "commission" | "conn
 const LAST = PORTAL_STOP;
 const PORTAL_ANIM_MS = 1500;
 
+// Music-room piece cycle (left-to-right pan order). Each entry is the world
+// point the camera should look at when that piece is selected on the remote.
+// Indices 2 and 4 are the two TVs — see MUSIC_ROOM_LEFT_TV_IDX / _RIGHT_TV_IDX
+// in MusicRoom.tsx.
+const MUSIC_ROOM_PIECES: ReadonlyArray<{
+  name: string;
+  lookAt: [number, number, number];
+}> = [
+  { name: "Album I",     lookAt: [29.5, 1.7, -5.98] },
+  { name: "Album II",    lookAt: [31.5, 1.7, -5.98] },
+  { name: "Left Screen", lookAt: [27.0, 2.8, -3.5] },
+  { name: "Media Board", lookAt: [33.99, 1.7, 0] },
+  { name: "Right Screen",lookAt: [27.0, 2.8, 3.5] },
+  { name: "Album III",   lookAt: [29.5, 1.7, 5.98] },
+  { name: "Album IV",    lookAt: [31.5, 1.7, 5.98] },
+];
+
 // Guided tour dwell — how long to sit at each stop AFTER the camera has fully
 // settled. Anchor stops get a longer beat; regular tier-based stops scale.
 // Tech Vault doorway is a pass-through waypoint in guided mode (the tour flies
@@ -54,6 +71,10 @@ export default function GalleryScene() {
   // to enter the vault and tour each glass display, or skip straight to the
   // next gallery piece.
   const [vaultPromptOpen, setVaultPromptOpen] = useState(false);
+  // Music-room remote — power toggles TV audio, pieceIdx drives the camera
+  // and which TV plays. Default: Media Board (center).
+  const [musicRoomPower, setMusicRoomPower] = useState(false);
+  const [musicRoomPieceIdx, setMusicRoomPieceIdx] = useState(3);
 
   const autoTour = mode === "guided";
   const setAutoTour = useCallback((v: boolean) => setMode(v ? "guided" : "manual"), []);
@@ -64,7 +85,6 @@ export default function GalleryScene() {
   const [target, setTarget] = useState(0);
   const scrollAccum = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const portalAudioRef = useRef<HTMLAudioElement | null>(null);
   const portalReturnStop = useRef<number>(PORTAL_STOP);
   const snapRef = useRef(false);
   const anyOverlayOpen = !!selectedProject || !!activePanel;
@@ -83,12 +103,8 @@ export default function GalleryScene() {
     audioRef.current = new Audio("/audio/gallery-vibes.mp3");
     audioRef.current.loop = true;
     audioRef.current.volume = 0.3;
-    portalAudioRef.current = new Audio("/audio/sticky-instrumental.mp3");
-    portalAudioRef.current.loop = true;
-    portalAudioRef.current.volume = 0;
     return () => {
       audioRef.current?.pause();
-      portalAudioRef.current?.pause();
     };
   }, []);
 
@@ -341,19 +357,34 @@ export default function GalleryScene() {
     portalReturnStop.current = Math.max(0, Math.min(LAST, Math.round(targetRef.current)));
     setMode("manual"); // auto-tour paused during portal
     setPortalStage("entering");
-    // Start the secret room track (was silent until now)
-    if (portalAudioRef.current) {
-      portalAudioRef.current.volume = 0;
-      portalAudioRef.current.play().catch(() => {});
-    }
-    // Cross-fade: gallery music down, portal music up (if user hasn't muted)
+    // Reset remote state — power off, start centered on the Media Board.
+    setMusicRoomPower(false);
+    setMusicRoomPieceIdx(3);
+    // Fade gallery music down so the music room starts silent (the user
+    // drives audio from the in-room remote).
     if (audioRef.current && musicPlaying) fadeAudio(audioRef.current, 0, 900);
-    if (musicPlaying) fadeAudio(portalAudioRef.current, 0.5, 900);
     // After animation, we're "inside" the room
     setTimeout(() => {
       setPortalStage((s) => (s === "entering" ? "inside" : s));
     }, PORTAL_ANIM_MS);
   }, [portalStage, fadeAudio, musicPlaying]);
+
+  // Music-room remote handlers. Next/prev cycle through MUSIC_ROOM_PIECES;
+  // togglePower flips audio for the currently-selected TV (handled in
+  // MusicRoom via postMessage).
+  const nextMusicPiece = useCallback(() => {
+    setMusicRoomPieceIdx(
+      (i) => (i + 1 + MUSIC_ROOM_PIECES.length) % MUSIC_ROOM_PIECES.length
+    );
+  }, []);
+  const prevMusicPiece = useCallback(() => {
+    setMusicRoomPieceIdx(
+      (i) => (i - 1 + MUSIC_ROOM_PIECES.length) % MUSIC_ROOM_PIECES.length
+    );
+  }, []);
+  const toggleMusicPower = useCallback(() => setMusicRoomPower((p) => !p), []);
+
+  const musicRoomLookAt = MUSIC_ROOM_PIECES[musicRoomPieceIdx].lookAt;
 
   const handlePortalExit = useCallback(() => {
     if (portalStage !== "inside") return;
@@ -361,11 +392,9 @@ export default function GalleryScene() {
     // Snap the gallery target to the return stop so STOPS resumes there cleanly after override releases
     updateTarget(portalReturnStop.current);
     snapRef.current = true;
-    // Cross-fade back
-    if (portalAudioRef.current) fadeAudio(portalAudioRef.current, 0, 700);
+    // Restore gallery music on the way out
     if (audioRef.current && musicPlaying) fadeAudio(audioRef.current, 0.3, 900);
     setTimeout(() => {
-      portalAudioRef.current?.pause();
       setPortalStage("none");
     }, PORTAL_ANIM_MS);
   }, [portalStage, fadeAudio, updateTarget, musicPlaying]);
@@ -514,6 +543,9 @@ export default function GalleryScene() {
             onDirectSnapDone={handleDirectSnapDone}
             onPortalProximityChange={setPortalReady}
             freeLook={portalStage === "inside"}
+            musicRoomTargetLookAt={portalStage === "inside" ? musicRoomLookAt : null}
+            musicRoomPower={musicRoomPower}
+            musicRoomPieceIdx={musicRoomPieceIdx}
           />
         </Suspense>
       </Canvas>
@@ -526,6 +558,20 @@ export default function GalleryScene() {
             <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.2, delay: 0.8 }} className="text-center text-4xl font-extralight text-gallery-white md:text-6xl lg:text-7xl">Created by <span className="text-gallery-accent">Coach B</span></motion.h1>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 1.8 }} className="mt-4 text-sm text-gallery-muted">Builder. Designer. Founder. Author.</motion.p>
             <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 2.8 }} onClick={handleEnter} className="mt-8 rounded-full border border-gallery-accent/40 px-6 py-2.5 text-xs font-medium tracking-wide text-gallery-accent transition-all hover:bg-gallery-accent hover:text-gallery-black">Enter the Gallery</motion.button>
+            {/* Secondary intro action — direct path to the Commission Desk
+                form for visitors who came to hire, not to browse. */}
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 1, delay: 3.2 }}
+              onClick={() => {
+                handleEnter();
+                setActivePanel("commission");
+              }}
+              className="mt-4 text-[10px] uppercase tracking-[0.28em] text-gallery-muted transition-colors hover:text-gallery-accent"
+            >
+              Or start a project →
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -552,6 +598,14 @@ export default function GalleryScene() {
                   <motion.span key={currentLabel} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} className="hidden text-[10px] uppercase tracking-[0.2em] text-gallery-accent md:block">{currentLabel}</motion.span>
                 )}
               </AnimatePresence>
+              {/* Persistent Hire Me CTA — opens the Commission Desk form so
+                  visitors with intent never have to hunt for how to inquire. */}
+              <button
+                onClick={() => setActivePanel("commission")}
+                className="rounded-full bg-gallery-accent px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-gallery-black transition-all hover:bg-gallery-accent/90"
+              >
+                Hire Me
+              </button>
               {!portalActive && (
                 <button onClick={() => setMapOpen(!mapOpen)} className={`rounded-full p-1.5 transition-all border ${mapOpen ? "border-gallery-accent/40 text-gallery-accent" : "border-white/10 text-gallery-muted hover:text-gallery-white"}`} aria-label="Gallery Map">
                   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
@@ -603,6 +657,99 @@ export default function GalleryScene() {
             <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             Exit Room
             <span className="hidden md:inline text-gallery-muted/60 ml-1">· Esc</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Music-room remote — sleek matte black pill with gold accents. Power
+          button drives audio for the currently-selected TV; arrows cycle
+          through all 7 pieces in left-to-right pan order. */}
+      <AnimatePresence>
+        {portalStage === "inside" && (
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 18 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed bottom-8 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border border-gallery-accent/30 bg-[#0c0a08]/95 px-3 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          >
+            {/* Power — glows gold when on, dim when off */}
+            <button
+              onClick={toggleMusicPower}
+              aria-label={musicRoomPower ? "Power off" : "Power on"}
+              className={`flex h-9 w-9 items-center justify-center rounded-full border transition-all ${
+                musicRoomPower
+                  ? "border-gallery-accent/70 bg-gallery-accent/15 text-gallery-accent shadow-[0_0_14px_rgba(201,168,76,0.35)]"
+                  : "border-white/15 bg-white/[0.04] text-gallery-muted hover:text-gallery-accent"
+              }`}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v9m5.25-7.5a8.25 8.25 0 11-10.5 0" />
+              </svg>
+            </button>
+
+            {/* Prev */}
+            <button
+              onClick={prevMusicPiece}
+              aria-label="Previous piece"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-gallery-light transition-all hover:border-gallery-accent/40 hover:text-gallery-accent"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            {/* Current piece label */}
+            <div className="flex min-w-[130px] flex-col items-center px-2">
+              <span className="text-[8px] font-medium uppercase tracking-[0.3em] text-gallery-muted/70">
+                Now Viewing
+              </span>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={MUSIC_ROOM_PIECES[musicRoomPieceIdx].name}
+                  initial={{ opacity: 0, y: -3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 3 }}
+                  transition={{ duration: 0.18 }}
+                  className="text-[11px] font-medium uppercase tracking-[0.18em] text-gallery-accent"
+                >
+                  {MUSIC_ROOM_PIECES[musicRoomPieceIdx].name}
+                </motion.span>
+              </AnimatePresence>
+            </div>
+
+            {/* Next */}
+            <button
+              onClick={nextMusicPiece}
+              aria-label="Next piece"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-gallery-light transition-all hover:border-gallery-accent/40 hover:text-gallery-accent"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Portal enter prompt — visible whenever the camera is close enough to
+          the chess-king portal. Tappable on mobile; desktop users can also
+          use it as a click target or press E. */}
+      <AnimatePresence>
+        {portalReady && entered && !portalActive && !anyOverlayOpen && (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.35 }}
+            onClick={handlePortalEnter}
+            className="fixed bottom-16 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-gallery-accent/40 bg-black/60 px-5 py-2.5 text-[11px] font-medium uppercase tracking-[0.18em] text-gallery-accent backdrop-blur-sm transition-all hover:bg-gallery-accent hover:text-gallery-black"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+            Enter Room
+            <span className="hidden md:inline text-gallery-muted/60 ml-1">· E</span>
           </motion.button>
         )}
       </AnimatePresence>

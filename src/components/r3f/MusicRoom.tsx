@@ -2,8 +2,14 @@
 
 import { useTexture, Html, Text } from "@react-three/drei";
 import * as THREE from "three";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import SpotLightWithTarget from "./SpotLightWithTarget";
+
+// Piece indices — the remote navigates through these in left-to-right order.
+// The two TV indices are exported so power logic can target the selected TV.
+export const MUSIC_ROOM_PIECE_COUNT = 7;
+export const MUSIC_ROOM_LEFT_TV_IDX = 2;
+export const MUSIC_ROOM_RIGHT_TV_IDX = 4;
 
 // Room bounds — sits directly behind gallery east wall (x = 19). Deep enough
 // that the back wall never fills the viewport at any browser aspect ratio.
@@ -22,12 +28,42 @@ const DEPTH_X = X_MAX - X_MIN;
 // Real media endpoints
 const SPOTIFY_SRC =
   "https://open.spotify.com/embed/artist/5g9KSIefKirB7JMpZvTNw5?utm_source=generator&theme=0";
-// YouTube clips — temporarily hidden from the wall; bringing them back in a
-// different layout later.
-// const YT_1 = "CpkCMAmhHc8";
-// const YT_2 = "ju3vv4EiEW0";
+// YouTube clips — shown on the two hanging flatscreens flanking the room.
+const TV_LEFT_YT = "CpkCMAmhHc8";
+const TV_RIGHT_YT = "ju3vv4EiEW0";
 // const YT_3 = "F51zQmvtruE";
 const APPLE_URL = "https://music.apple.com/us/artist/manny-baby/1131992992";
+
+// Build a YouTube embed URL. Videos start paused and muted; the in-scene
+// remote's power button drives play/pause + mute/unmute via the JS API.
+function ytEmbedUrl(id: string) {
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
+  const params = new URLSearchParams({
+    autoplay: "0",
+    mute: "1",
+    loop: "1",
+    playlist: id,
+    controls: "1",
+    modestbranding: "1",
+    rel: "0",
+    playsinline: "1",
+    enablejsapi: "1",
+    ...(origin ? { origin } : {}),
+  });
+  return `https://www.youtube-nocookie.com/embed/${id}?${params.toString()}`;
+}
+
+// Send a command to a YouTube iframe via postMessage. Requires enablejsapi=1
+// on the src. Safe no-op if the iframe hasn't loaded yet.
+function sendYtCommand(
+  iframe: HTMLIFrameElement | null,
+  func: "playVideo" | "pauseVideo" | "mute" | "unMute"
+) {
+  if (!iframe || !iframe.contentWindow) return;
+  const msg = JSON.stringify({ event: "command", func, args: "" });
+  iframe.contentWindow.postMessage(msg, "*");
+}
 
 
 // Procedural marble — cream base with layered veining. Canvas-generated so
@@ -38,15 +74,17 @@ function createMarbleTexture(): THREE.CanvasTexture {
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d")!;
 
-  // Pure white base (Carrara-style)
-  ctx.fillStyle = "#f7f7f9";
+  // Warm white base (Calacatta-style)
+  ctx.fillStyle = "#faf8f2";
   ctx.fillRect(0, 0, size, size);
 
-  // Cool grey veining
-  for (let i = 0; i < 70; i++) {
-    const opacity = 0.06 + Math.random() * 0.2;
-    ctx.strokeStyle = `rgba(140, 142, 155, ${opacity})`;
-    ctx.lineWidth = 0.4 + Math.random() * 1.6;
+  // Rich gold veining — varied thickness and opacity for natural layering
+  for (let i = 0; i < 75; i++) {
+    const opacity = 0.08 + Math.random() * 0.28;
+    // Alternate between deep warm gold and a lighter champagne highlight
+    const gold = Math.random() > 0.35 ? [176, 140, 56] : [214, 182, 104];
+    ctx.strokeStyle = `rgba(${gold[0]}, ${gold[1]}, ${gold[2]}, ${opacity})`;
+    ctx.lineWidth = 0.4 + Math.random() * 1.8;
     ctx.beginPath();
     let x = Math.random() * size;
     let y = Math.random() * size;
@@ -59,9 +97,9 @@ function createMarbleTexture(): THREE.CanvasTexture {
     ctx.stroke();
   }
 
-  // Subtle cool speckle for tactile grain
+  // Subtle warm speckle for tactile grain
   for (let i = 0; i < 3500; i++) {
-    ctx.fillStyle = `rgba(185, 188, 200, ${Math.random() * 0.07})`;
+    ctx.fillStyle = `rgba(210, 180, 120, ${Math.random() * 0.08})`;
     ctx.fillRect(Math.random() * size, Math.random() * size, 1, 1);
   }
 
@@ -152,11 +190,99 @@ function AlbumPiece({ position, rotation, texture, label }: AlbumPieceProps) {
   );
 }
 
-interface Props {
-  onOpenPanel?: (panel: string) => void;
+// Hanging flatscreen TV — ceiling-mounted via cable, thin black bezel, and a
+// YouTube iframe embedded as the screen via Html transform mode.
+interface CeilingTVProps {
+  /** x/z of the TV's horizontal anchor; y is the center height of the bezel. */
+  position: [number, number, number];
+  /** Y rotation in radians. The TV's screen faces +Z at rotationY = 0; use
+   *  -Math.PI/2 to face -X (toward the entry camera at low x). */
+  rotationY: number;
+  /** YouTube video ID to embed. */
+  videoId: string;
+  /** Ceiling height — cable runs from here down to the top of the TV. */
+  ceilingY: number;
+  /** Ref to the inner iframe so a parent can drive play/pause/mute via postMessage. */
+  iframeRef?: React.Ref<HTMLIFrameElement>;
+}
+function CeilingTV({ position, rotationY, videoId, ceilingY, iframeRef }: CeilingTVProps) {
+  const W = 2.5; // bezel outer width
+  const H = 1.42; // bezel outer height (roughly 16:9)
+  const screenInset = 0.07; // bezel thickness around the screen
+  const screenW = W - screenInset * 2;
+  const screenH = H - screenInset * 2;
+  // Iframe is rendered at 640×360 CSS px; scale to match the screen's world size.
+  const iframePxW = 640;
+  const iframePxH = 360;
+  const tvY = position[1];
+  const cableLen = Math.max(0.15, ceilingY - (tvY + H / 2));
+
+  return (
+    <group position={position} rotation={[0, rotationY, 0]}>
+      {/* Ceiling cable — from the ceiling down to the top of the TV */}
+      <mesh position={[0, H / 2 + cableLen / 2, 0]}>
+        <cylinderGeometry args={[0.012, 0.012, cableLen, 8]} />
+        <meshStandardMaterial color="#1a1a1e" />
+      </mesh>
+      {/* Small mount plate at the top of the TV */}
+      <mesh position={[0, H / 2 + 0.015, 0]}>
+        <boxGeometry args={[0.12, 0.03, 0.08]} />
+        <meshStandardMaterial color="#1a1a1e" metalness={0.5} roughness={0.5} />
+      </mesh>
+
+      {/* Bezel — thin matte-black flatscreen body */}
+      <mesh castShadow>
+        <boxGeometry args={[W, H, 0.06]} />
+        <meshStandardMaterial color="#0a0a0a" metalness={0.35} roughness={0.5} />
+      </mesh>
+      {/* Inset dark screen plane (shows through the iframe before it loads,
+          and acts as a fallback if the iframe fails to render). */}
+      <mesh position={[0, 0, 0.031]}>
+        <planeGeometry args={[screenW, screenH]} />
+        <meshBasicMaterial color="#050505" />
+      </mesh>
+
+      {/* YouTube embed — DOM overlay anchored to the TV's 3D center, sized
+          in viewport units so it matches the bezel's projected screen area
+          from the fixed entry camera. Transform mode has iframe quirks, so
+          this gives us a reliable render at the cost of not tilting with
+          the camera. */}
+      <Html
+        center
+        position={[0, 0, 0.034]}
+        zIndexRange={[30, 0]}
+        style={{ pointerEvents: "auto", userSelect: "none" }}
+      >
+        <iframe
+          ref={iframeRef}
+          title={`TV ${videoId}`}
+          src={ytEmbedUrl(videoId)}
+          width={340}
+          height={191}
+          allow="autoplay; encrypted-media; picture-in-picture"
+          loading="lazy"
+          style={{
+            border: 0,
+            display: "block",
+            borderRadius: "4px",
+            background: "#050505",
+          }}
+        />
+      </Html>
+    </group>
+  );
 }
 
-export default function MusicRoom(_props: Props) {
+interface Props {
+  onOpenPanel?: (panel: string) => void;
+  /** Remote power state. When on AND a TV is the selected piece, that TV
+   *  plays + unmutes. Otherwise both TVs are paused + muted (last frame held). */
+  powerOn?: boolean;
+  /** Index of the currently selected piece (0..6). See MUSIC_ROOM_*_TV_IDX. */
+  currentPieceIdx?: number;
+}
+
+export default function MusicRoom({ powerOn = false, currentPieceIdx = 3 }: Props) {
   const wallTex = useTexture("/images/gallery/wall.jpg");
   const ceilingTex = useTexture("/images/gallery/ceiling.jpg");
   const marbleTex = useMemo(() => createMarbleTexture(), []);
@@ -173,36 +299,118 @@ export default function MusicRoom(_props: Props) {
     marbleTex.repeat.set(5, 4);
   }, [wallTex, ceilingTex, marbleTex]);
 
+  // TV iframe refs — driven by the remote's power button + selected piece.
+  const leftTvRef = useRef<HTMLIFrameElement>(null);
+  const rightTvRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    // Give the iframe a moment to bind its JS API listener after mount/src
+    // change. Without the delay, postMessage fires before YT is listening and
+    // the first power-on click does nothing.
+    const t = setTimeout(() => {
+      const applyState = (
+        iframe: HTMLIFrameElement | null,
+        shouldPlay: boolean
+      ) => {
+        if (shouldPlay) {
+          sendYtCommand(iframe, "unMute");
+          sendYtCommand(iframe, "playVideo");
+        } else {
+          sendYtCommand(iframe, "pauseVideo");
+          sendYtCommand(iframe, "mute");
+        }
+      };
+      applyState(
+        leftTvRef.current,
+        powerOn && currentPieceIdx === MUSIC_ROOM_LEFT_TV_IDX
+      );
+      applyState(
+        rightTvRef.current,
+        powerOn && currentPieceIdx === MUSIC_ROOM_RIGHT_TV_IDX
+      );
+    }, 200);
+    return () => clearTimeout(t);
+  }, [powerOn, currentPieceIdx]);
+
   return (
     <group>
-      {/* Lighting */}
-      <ambientLight intensity={0.35} color="#ffffff" />
+      {/* Lighting — ambient + two invisible ceiling fills (the pendant
+          bulbs were replaced with hanging flatscreens). */}
+      <ambientLight intensity={0.55} color="#ffffff" />
+      <pointLight
+        position={[CX - 2, HEIGHT - 0.4, 0]}
+        intensity={4}
+        distance={14}
+        color="#fff1d6"
+        decay={1.5}
+      />
+      <pointLight
+        position={[CX + 2, HEIGHT - 0.4, 0]}
+        intensity={4}
+        distance={14}
+        color="#fff1d6"
+        decay={1.5}
+      />
 
-      {/* Ceiling lights — 2×2 grid, pendant-style hanging below the ceiling */}
-      {[
-        [CX - 2, Z_MIN + 2],
-        [CX - 2, Z_MAX - 2],
-        [CX + 2, Z_MIN + 2],
-        [CX + 2, Z_MAX - 2],
-      ].map(([lx, lz], i) => (
-        <group key={i} position={[lx, HEIGHT - 0.6, lz]}>
-          {/* Thin cord from ceiling to fixture */}
-          <mesh position={[0, 0.3, 0]}>
-            <cylinderGeometry args={[0.01, 0.01, 0.6, 8]} />
-            <meshStandardMaterial color="#1a1a1e" />
+      {/* ====== HANGING FLATSCREENS — one per side, ceiling-suspended ======
+          Both hang in the room (not on walls) flanking the media board, each
+          angled toward the entry camera at x≈21 so the screens face the user
+          instead of presenting edge-on. */}
+      <CeilingTV
+        position={[27, 2.8, -3.5]}
+        rotationY={-Math.PI / 2}
+        videoId={TV_LEFT_YT}
+        ceilingY={HEIGHT}
+        iframeRef={leftTvRef}
+      />
+      <CeilingTV
+        position={[27, 2.8, 3.5]}
+        rotationY={-Math.PI / 2}
+        videoId={TV_RIGHT_YT}
+        ceilingY={HEIGHT}
+        iframeRef={rightTvRef}
+      />
+
+      {/* ====== BACK-WALL SPEAKERS — floor-standing studio monitors ======
+          Flanking the media board, one on each side of the back wall. */}
+      {([-4.5, 4.5] as const).map((sz) => (
+        <group key={`spk-${sz}`} position={[X_MAX - 0.2, 0, sz]}>
+          {/* Base plate */}
+          <mesh position={[0, 0.04, 0]} castShadow receiveShadow>
+            <boxGeometry args={[0.45, 0.08, 0.45]} />
+            <meshStandardMaterial color="#0a0a0a" metalness={0.4} roughness={0.55} />
           </mesh>
-          {/* Glowing bulb — uses meshBasicMaterial so it's always bright */}
-          <mesh>
-            <sphereGeometry args={[0.2, 24, 16]} />
-            <meshBasicMaterial color="#fff3d8" toneMapped={false} />
+          {/* Cabinet */}
+          <mesh position={[0, 0.85, 0]} castShadow>
+            <boxGeometry args={[0.36, 1.5, 0.38]} />
+            <meshStandardMaterial color="#0a0a0a" metalness={0.4} roughness={0.6} />
           </mesh>
-          {/* Outer glow shell (semi-transparent) */}
-          <mesh>
-            <sphereGeometry args={[0.35, 24, 16]} />
-            <meshBasicMaterial color="#fff1d6" transparent opacity={0.25} toneMapped={false} />
+          {/* Tweeter (top) — on the front face (-x) */}
+          <mesh position={[-0.181, 1.35, 0]} rotation={[0, -Math.PI / 2, 0]}>
+            <circleGeometry args={[0.06, 24]} />
+            <meshStandardMaterial color="#1a1a1a" metalness={0.7} roughness={0.3} />
           </mesh>
-          {/* Light source */}
-          <pointLight intensity={6} distance={12} color="#fff1d6" decay={1.5} />
+          {/* Woofer (mid) — larger cone below the tweeter */}
+          <mesh position={[-0.181, 0.85, 0]} rotation={[0, -Math.PI / 2, 0]}>
+            <circleGeometry args={[0.13, 28]} />
+            <meshStandardMaterial color="#050505" metalness={0.6} roughness={0.4} />
+          </mesh>
+          {/* Woofer dust cap (center) */}
+          <mesh position={[-0.183, 0.85, 0]} rotation={[0, -Math.PI / 2, 0]}>
+            <circleGeometry args={[0.04, 24]} />
+            <meshStandardMaterial color="#222" metalness={0.7} roughness={0.3} />
+          </mesh>
+          {/* Brand plate */}
+          <mesh position={[-0.183, 0.4, 0]} rotation={[0, -Math.PI / 2, 0]}>
+            <planeGeometry args={[0.16, 0.03]} />
+            <meshStandardMaterial
+              color="#c9a84c"
+              emissive="#c9a84c"
+              emissiveIntensity={0.18}
+              metalness={0.9}
+              roughness={0.3}
+            />
+          </mesh>
         </group>
       ))}
 
@@ -317,52 +525,59 @@ export default function MusicRoom(_props: Props) {
             quirks. Sized in viewport units so the Spotify embed roughly
             matches the frame's projected screen area from the fixed entry
             camera across typical desktop aspect ratios. */}
+        {/* Spotify embed — anchored to the upper portion of the gold frame */}
         <Html
           center
-          position={[0, -0.3, 0.012]}
+          position={[0, 0, 0.012]}
           zIndexRange={[50, 0]}
           style={{ pointerEvents: "auto", userSelect: "none" }}
         >
-          <div
+          <iframe
+            title="Spotify"
+            src={SPOTIFY_SRC}
+            width="100%"
+            height="315"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
             style={{
+              border: 0,
+              display: "block",
+              borderRadius: "8px",
               width: "min(38vw, 520px)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "14px",
+            }}
+          />
+        </Html>
+
+        {/* Apple Music call-to-action — separate DOM anchor lower on the back
+            wall so it sits visually below the Spotify media, not inside it. */}
+        <Html
+          center
+          position={[0, -1.4, 0.012]}
+          zIndexRange={[50, 0]}
+          style={{ pointerEvents: "auto", userSelect: "none" }}
+        >
+          <a
+            href={APPLE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-block",
+              padding: "10px 28px",
+              borderRadius: "4px",
+              background: "linear-gradient(180deg, #14110b 0%, #0a0806 100%)",
+              border: "1px solid rgba(201,168,76,0.42)",
+              color: "#e8c56a",
+              textDecoration: "none",
+              fontSize: "12px",
+              fontWeight: 600,
+              letterSpacing: "0.25em",
+              textTransform: "uppercase",
               fontFamily: "system-ui, -apple-system, sans-serif",
-              color: "#fff",
+              whiteSpace: "nowrap",
             }}
           >
-            <iframe
-              title="Spotify"
-              src={SPOTIFY_SRC}
-              width="100%"
-              height="230"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              loading="lazy"
-              style={{ border: 0, display: "block", borderRadius: "8px", width: "100%" }}
-            />
-            <a
-              href={APPLE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                padding: "10px 26px",
-                borderRadius: "4px",
-                background: "linear-gradient(180deg, #14110b 0%, #0a0806 100%)",
-                border: "1px solid rgba(201,168,76,0.42)",
-                color: "#e8c56a",
-                textDecoration: "none",
-                fontSize: "12px",
-                fontWeight: 600,
-                letterSpacing: "0.25em",
-                textTransform: "uppercase",
-              }}
-            >
-              Listen on Apple Music
-            </a>
-          </div>
+            Listen on Apple Music
+          </a>
         </Html>
       </group>
 

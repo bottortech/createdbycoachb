@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 // Tweak these to taste
-const TRIGGER_DELAY_MS = 15_000;            // show after 15s on the site
+const TRIGGER_DELAY_MS = 30_000;            // show 30s after first interaction
 const SESSION_KEY = "coachb_feedback_seen"; // one popup per session
 
 // Formspree / Getform endpoint. Set in .env.local as:
@@ -22,13 +22,16 @@ export default function FeedbackToast() {
   const [sending, setSending] = useState(false);
   const [errored, setErrored] = useState(false);
 
-  // Timer — fires once per session, pauses while the tab is hidden
+  // Timer — fires once per session, pauses while the tab is hidden, and
+  // starts counting from the user's first real interaction (click / tap /
+  // keypress) rather than page-load, so the 15s measures engaged time.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (sessionStorage.getItem(SESSION_KEY)) return;
 
+    let started = false;
     let elapsed = 0;
-    let last = performance.now();
+    let last = 0;
     let id: number | null = null;
 
     const tick = () => {
@@ -41,10 +44,22 @@ export default function FeedbackToast() {
       }
       id = requestAnimationFrame(tick);
     };
-    id = requestAnimationFrame(tick);
+
+    const events = ["pointerdown", "touchstart", "keydown"];
+    const startTimer = () => {
+      if (started) return;
+      started = true;
+      last = performance.now();
+      id = requestAnimationFrame(tick);
+      events.forEach((e) => window.removeEventListener(e, startTimer));
+    };
+    events.forEach((e) =>
+      window.addEventListener(e, startTimer, { once: true, passive: true })
+    );
 
     return () => {
       if (id !== null) cancelAnimationFrame(id);
+      events.forEach((e) => window.removeEventListener(e, startTimer));
     };
   }, []);
 
