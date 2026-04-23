@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
+import { SPOTIFY_SRC, TV_LEFT_YT, TV_RIGHT_YT, APPLE_URL } from "./MusicRoom";
 import ProjectModal, { Project } from "../gallery/ProjectModal";
 import GalleryOverlayPanel from "./GalleryOverlayPanel";
 import GalleryMap from "./GalleryMap";
@@ -75,6 +76,19 @@ export default function GalleryScene() {
   // and which TV plays. Default: Media Board (center).
   const [musicRoomPower, setMusicRoomPower] = useState(false);
   const [musicRoomPieceIdx, setMusicRoomPieceIdx] = useState(3);
+
+  // Mobile detection — on narrow viewports we swap the 3D music room for a
+  // clean 2D music-app layout (no camera / free-look / floor). The 3D scene
+  // stays mounted behind the overlay so portal enter/exit still works.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   const autoTour = mode === "guided";
   const setAutoTour = useCallback((v: boolean) => setMode(v ? "guided" : "manual"), []);
@@ -661,11 +675,106 @@ export default function GalleryScene() {
         )}
       </AnimatePresence>
 
+      {/* Music-room — mobile 2D overlay. On narrow viewports we replace the
+          3D room with a clean vertical music-app layout: scrollable media
+          stack + a fixed bottom nav with the Exit control. The 3D scene
+          keeps running behind the overlay so portal enter/exit still works. */}
+      <AnimatePresence>
+        {isMobile && portalStage !== "none" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35 }}
+            className="fixed inset-0 z-40 overflow-y-auto bg-[#0a0806]"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            <div className="flex min-h-full flex-col items-center px-5 pb-28 pt-6">
+              <div className="mb-1 text-[9px] font-medium uppercase tracking-[0.3em] text-gallery-accent/80">
+                Hidden Room
+              </div>
+              <h2 className="mb-6 text-lg font-light tracking-[0.25em] text-gallery-white">
+                MUSIC ROOM
+              </h2>
+
+              <div className="flex w-full max-w-[320px] flex-col items-stretch gap-5">
+                {/* Spotify */}
+                <div className="w-full overflow-hidden rounded-lg">
+                  <iframe
+                    title="Spotify"
+                    src={SPOTIFY_SRC}
+                    width="100%"
+                    height={352}
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy"
+                    style={{ border: 0, display: "block", width: "100%" }}
+                  />
+                </div>
+
+                {/* YouTube — Left TV video */}
+                <div
+                  className="w-full overflow-hidden rounded-lg"
+                  style={{ aspectRatio: "16 / 9" }}
+                >
+                  <iframe
+                    title="Video I"
+                    src={`https://www.youtube-nocookie.com/embed/${TV_LEFT_YT}?rel=0&playsinline=1&modestbranding=1`}
+                    allow="encrypted-media; picture-in-picture"
+                    allowFullScreen
+                    loading="lazy"
+                    style={{ border: 0, display: "block", width: "100%", height: "100%" }}
+                  />
+                </div>
+
+                {/* YouTube — Right TV video */}
+                <div
+                  className="w-full overflow-hidden rounded-lg"
+                  style={{ aspectRatio: "16 / 9" }}
+                >
+                  <iframe
+                    title="Video II"
+                    src={`https://www.youtube-nocookie.com/embed/${TV_RIGHT_YT}?rel=0&playsinline=1&modestbranding=1`}
+                    allow="encrypted-media; picture-in-picture"
+                    allowFullScreen
+                    loading="lazy"
+                    style={{ border: 0, display: "block", width: "100%", height: "100%" }}
+                  />
+                </div>
+
+                {/* Apple Music CTA */}
+                <a
+                  href={APPLE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block rounded-lg border border-gallery-accent/40 bg-gradient-to-b from-[#14110b] to-[#0a0806] py-3 text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-gallery-accent transition-colors hover:bg-gallery-accent hover:text-gallery-black"
+                >
+                  Listen on Apple Music
+                </a>
+              </div>
+            </div>
+
+            {/* Fixed bottom navigation — Exit the room */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0c0a08]/95 px-4 py-3 backdrop-blur-xl">
+              <button
+                onClick={handlePortalExit}
+                className="mx-auto flex items-center justify-center gap-2 rounded-full border border-gallery-accent/40 bg-gallery-accent px-6 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-gallery-black transition-all active:scale-95"
+              >
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Exit Music Room
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Music-room remote — sleek matte black pill with gold accents. Power
           button drives audio for the currently-selected TV; arrows cycle
-          through all 7 pieces in left-to-right pan order. */}
+          through all 7 pieces in left-to-right pan order. Desktop only; the
+          mobile layout above has its own inline controls. */}
       <AnimatePresence>
-        {portalStage === "inside" && (
+        {portalStage === "inside" && !isMobile && (
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}

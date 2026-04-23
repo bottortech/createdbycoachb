@@ -25,14 +25,15 @@ const CZ = (Z_MIN + Z_MAX) / 2;
 const WIDTH_Z = Z_MAX - Z_MIN;
 const DEPTH_X = X_MAX - X_MIN;
 
-// Real media endpoints
-const SPOTIFY_SRC =
+// Real media endpoints — exported so the mobile 2D overlay in GalleryScene
+// can reuse the same sources without hard-coding them twice.
+export const SPOTIFY_SRC =
   "https://open.spotify.com/embed/artist/5g9KSIefKirB7JMpZvTNw5?utm_source=generator&theme=0";
 // YouTube clips — shown on the two hanging flatscreens flanking the room.
-const TV_LEFT_YT = "CpkCMAmhHc8";
-const TV_RIGHT_YT = "ju3vv4EiEW0";
+export const TV_LEFT_YT = "CpkCMAmhHc8";
+export const TV_RIGHT_YT = "ju3vv4EiEW0";
 // const YT_3 = "F51zQmvtruE";
-const APPLE_URL = "https://music.apple.com/us/artist/manny-baby/1131992992";
+export const APPLE_URL = "https://music.apple.com/us/artist/manny-baby/1131992992";
 
 // Build a YouTube embed URL. Videos start paused and muted; the in-scene
 // remote's power button drives play/pause + mute/unmute via the JS API.
