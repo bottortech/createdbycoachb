@@ -71,6 +71,13 @@ export default function WallArtwork({
   const { camera } = useThree();
   const portalWorldPos = useRef(new THREE.Vector3(...position));
 
+  // Portal activation — triple-tap (or triple-click) the painting within a
+  // short window. Works on both desktop and touch. Requires the camera to
+  // already be within portal proximity so stray taps from across the room
+  // can't trigger it.
+  const portalTapCount = useRef(0);
+  const portalTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const aspect = FRAME_ASPECT[frameType];
   const height = width / aspect;
 
@@ -118,7 +125,7 @@ export default function WallArtwork({
       <group
         ref={groupRef}
         onPointerOver={(e) => {
-          // Portal is keyboard-triggered — stays fully inert on hover/click
+          // Portal shows no hover state — its activation is deliberately hidden.
           if (isPortal) return;
           e.stopPropagation();
           setHovered(true);
@@ -126,8 +133,22 @@ export default function WallArtwork({
         }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = "default"; }}
         onClick={(e) => {
-          if (isPortal) return;
           e.stopPropagation();
+          if (isPortal) {
+            // Triple-tap within ~900ms to activate — only when close enough.
+            if (!portalReadyRef.current) return;
+            portalTapCount.current += 1;
+            if (portalTapTimer.current) clearTimeout(portalTapTimer.current);
+            if (portalTapCount.current >= 3) {
+              portalTapCount.current = 0;
+              onClick();
+              return;
+            }
+            portalTapTimer.current = setTimeout(() => {
+              portalTapCount.current = 0;
+            }, 900);
+            return;
+          }
           onClick();
         }}
       >
