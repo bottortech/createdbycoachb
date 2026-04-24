@@ -1047,11 +1047,13 @@ export default function GalleryScene() {
         )}
       </AnimatePresence>
 
-      {/* Manual mode — return to guided button (hidden while auto-tour is disabled) */}
+      {/* Manual mode — "start auto tour" CTA. Bottom-center above the
+          progress bar so it doesn't collide with the right-side hunt hint
+          or the left-side gallery map. */}
       {AUTO_TOUR_ENABLED && entered && mode === "manual" && !anyOverlayOpen && !portalActive && (
         <button
           onClick={() => setMode("guided")}
-          className="fixed top-14 right-4 z-20 rounded-full border border-gallery-accent/30 bg-black/50 px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-gallery-accent backdrop-blur-sm transition-all hover:bg-gallery-accent hover:text-gallery-black"
+          className="fixed bottom-12 left-1/2 z-20 -translate-x-1/2 rounded-full border border-gallery-accent/30 bg-black/60 px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-gallery-accent backdrop-blur-sm transition-all hover:bg-gallery-accent hover:text-gallery-black"
         >
           Start Auto Tour
         </button>
