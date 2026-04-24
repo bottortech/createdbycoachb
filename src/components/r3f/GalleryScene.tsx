@@ -25,6 +25,9 @@ const PORTAL_ANIM_MS = 1500;
 const STUDY_CODE = "DEV007"; // normalized (no dash) — keypad accepts either
 const STUDY_REQUIRED_LETTERS: ReadonlyArray<string> = ["D", "E", "V", "7"];
 const STUDY_STORAGE_KEY = "coachb_study_progress_v1";
+const HUNT_HINT_STORAGE_KEY = "coachb_hunt_hint_seen_v1";
+// Delay before the hunt hint fades in after the user enters the gallery.
+const HUNT_HINT_DELAY_MS = 4000;
 
 // Hidden letter placements. Chosen so finding them requires looking closely
 // at different parts of the gallery — not floating in the middle of the room.
@@ -129,6 +132,12 @@ export default function GalleryScene() {
   const [pendingStudyEnter, setPendingStudyEnter] = useState(false);
   const allLettersFound = foundLetters.length >= STUDY_REQUIRED_LETTERS.length;
 
+  // One-time hunt hint shown after the user enters the gallery so they know
+  // there's a scavenger hunt + hidden room to unlock. Dismiss button + any
+  // first-letter collection marks it "seen" and it won't show again.
+  const [huntHintVisible, setHuntHintVisible] = useState(false);
+  const [huntHintSeen, setHuntHintSeen] = useState(true); // true until hydrated to avoid flash
+
   // Throne / winner popup state machine. Fires after a successful keypad
   // submit — checks the server-side "first solver" flag, then shows either
   // the winner form or the "throne claimed" waitlist popup before letting
@@ -158,16 +167,19 @@ export default function GalleryScene() {
     if (typeof window === "undefined") return;
     try {
       const raw = localStorage.getItem(STUDY_STORAGE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as {
-        foundLetters?: string[];
-        studyUnlocked?: boolean;
-      };
-      if (Array.isArray(saved.foundLetters)) setFoundLetters(saved.foundLetters);
-      if (saved.studyUnlocked) setStudyUnlocked(true);
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          foundLetters?: string[];
+          studyUnlocked?: boolean;
+        };
+        if (Array.isArray(saved.foundLetters)) setFoundLetters(saved.foundLetters);
+        if (saved.studyUnlocked) setStudyUnlocked(true);
+      }
     } catch {
       // ignore corrupt storage
     }
+    // Hunt hint — only new visitors should see it.
+    setHuntHintSeen(localStorage.getItem(HUNT_HINT_STORAGE_KEY) === "1");
   }, []);
 
   // Persist whenever progress changes.
@@ -179,9 +191,32 @@ export default function GalleryScene() {
     );
   }, [foundLetters, studyUnlocked]);
 
+  const dismissHuntHint = useCallback(() => {
+    setHuntHintVisible(false);
+    setHuntHintSeen(true);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(HUNT_HINT_STORAGE_KEY, "1");
+    }
+  }, []);
+
   const handleLetterCollect = useCallback((char: string) => {
     setFoundLetters((prev) => (prev.includes(char) ? prev : [...prev, char]));
-  }, []);
+    // First letter collected = user discovered the hunt on their own.
+    // No need to keep the hint around.
+    dismissHuntHint();
+  }, [dismissHuntHint]);
+
+  // Reveal the hunt hint shortly after the user enters the gallery, so
+  // they know there's a scavenger hunt + hidden room to find. Skipped if
+  // they've already seen it, already unlocked the study, or are currently
+  // in a portal / modal.
+  useEffect(() => {
+    if (!entered) return;
+    if (huntHintSeen) return;
+    if (studyUnlocked) return;
+    const t = setTimeout(() => setHuntHintVisible(true), HUNT_HINT_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [entered, huntHintSeen, studyUnlocked]);
 
   // Left-side painting click. If the user hasn't unlocked yet → open the
   // keypad. If already unlocked → fly straight into the 3D Founder's Study.
@@ -970,6 +1005,47 @@ export default function GalleryScene() {
           </div>
         </div>
       )}
+
+      {/* Hunt hint — one-time nudge letting new visitors know there's a
+          scavenger hunt + hidden room to unlock. Dismissed on X click,
+          on first-letter collection, or once per browser (localStorage). */}
+      <AnimatePresence>
+        {huntHintVisible && entered && !studyUnlocked && !portalActive && !anyOverlayOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed bottom-16 left-4 z-30 w-[280px] rounded-xl border border-gallery-accent/30 bg-[#0c0a08]/95 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          >
+            <button
+              onClick={dismissHuntHint}
+              aria-label="Dismiss"
+              className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-gallery-muted transition-colors hover:text-gallery-accent"
+            >
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="mb-1 flex items-center gap-1.5 text-[9px] font-medium uppercase tracking-[0.3em] text-gallery-accent">
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+              </svg>
+              Hidden Challenge
+            </div>
+            <h3 className="mb-2 text-[13px] font-medium text-gallery-white">
+              Find the code.
+            </h3>
+            <p className="text-[11px] leading-relaxed text-gallery-muted">
+              Four letters are hidden around the gallery. Collect them all,
+              enter the code, and unlock the Founder's Study.
+              <span className="mt-1 block text-gallery-accent/80">
+                First to solve wins a prize.
+              </span>
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Manual mode — return to guided button (hidden while auto-tour is disabled) */}
       {AUTO_TOUR_ENABLED && entered && mode === "manual" && !anyOverlayOpen && !portalActive && (
