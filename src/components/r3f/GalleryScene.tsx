@@ -6,6 +6,7 @@ import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "rea
 import { AnimatePresence, motion } from "framer-motion";
 import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
 import { SPOTIFY_SRC, TV_LEFT_YT, TV_RIGHT_YT, APPLE_URL } from "./MusicRoom";
+import { STUDY_ROOM_CAMERA, STUDY_PIECES, STUDY_DEFAULT_PIECE_IDX, STUDY_BOOK_TITLES } from "./FoundersStudy";
 import ProjectModal, { Project } from "../gallery/ProjectModal";
 import GalleryOverlayPanel from "./GalleryOverlayPanel";
 import GalleryMap from "./GalleryMap";
@@ -17,6 +18,37 @@ type PanelType = "enterprise" | "studio" | "appointments" | "commission" | "conn
 // but are only addressable via the TechVaultMap, not by scrolling.
 const LAST = PORTAL_STOP;
 const PORTAL_ANIM_MS = 1500;
+
+// Hidden Founder's Study unlock — scavenger hunt. Users find 4 characters
+// scattered across the main gallery floor, then enter DEV-007 on a keypad
+// mounted on the left-side.png painting to unlock the room.
+const STUDY_CODE = "DEV007"; // normalized (no dash) — keypad accepts either
+const STUDY_REQUIRED_LETTERS: ReadonlyArray<string> = ["D", "E", "V", "7"];
+const STUDY_STORAGE_KEY = "coachb_study_progress_v1";
+
+// Hidden letter placements. Chosen so finding them requires looking closely
+// at different parts of the gallery — not floating in the middle of the room.
+interface HiddenLetterPlacement {
+  char: string;
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  size?: number;
+}
+const HIDDEN_LETTERS: ReadonlyArray<HiddenLetterPlacement> = [
+  // D — front face of the goat statue's marble pedestal.
+  // Visible at Stop 7 where the camera looks down at the goat.
+  { char: "D", position: [10, 0.3, -0.95], size: 0.11 },
+  // E — on the top wall below the WiggleWoo Character piece.
+  // Visible at Stop 12 where the camera looks north at the artwork.
+  { char: "E", position: [15.5, 0.8, 0.99], rotation: [0, Math.PI, 0], size: 0.13 },
+  // V — on the bottom wall below the JB TV piece.
+  // Visible at Stop 4 where the camera looks south at the artwork.
+  { char: "V", position: [7.0, 0.8, -3.99], size: 0.13 },
+  // 7 — laid flat on the floor in front of the Service pedestal row.
+  // Visible at Stop 14 where the camera is elevated (y=2.8) and tilts down
+  // at the pedestals, so the floor is inside the frame.
+  { char: "7", position: [16, 0.02, -1.5], rotation: [-Math.PI / 2, 0, 0], size: 0.16 },
+];
 
 // Music-room piece cycle (left-to-right pan order). Each entry is the world
 // point the camera should look at when that piece is selected on the remote.
@@ -59,6 +91,9 @@ export default function GalleryScene() {
   const [currentLabel, setCurrentLabel] = useState("Entrance");
   const [mapOpen, setMapOpen] = useState(false);
   const [portalStage, setPortalStage] = useState<"none" | "entering" | "inside" | "exiting">("none");
+  // Which hidden portal is currently active — drives which room the camera
+  // transitions into and which room component GalleryRoom mounts.
+  const [activePortal, setActivePortal] = useState<"music" | "study" | null>(null);
   const [portalReady, setPortalReady] = useState(false);
   // Active direct A→B camera override — used for vault-to-vault jumps so the
   // camera flies straight between two vault stops instead of sweeping through
@@ -76,6 +111,118 @@ export default function GalleryScene() {
   // and which TV plays. Default: Media Board (center).
   const [musicRoomPower, setMusicRoomPower] = useState(false);
   const [musicRoomPieceIdx, setMusicRoomPieceIdx] = useState(3);
+
+  // Study remote — pieceIdx drives camera (Welcome first). Bookshelf piece has
+  // a secondary "book title" cycler that highlights the matching book in 3D.
+  const [studyPieceIdx, setStudyPieceIdx] = useState(STUDY_DEFAULT_PIECE_IDX);
+  const [studyBookIdx, setStudyBookIdx] = useState(0);
+
+  // Scavenger hunt state (hidden Founder's Study unlock).
+  const [foundLetters, setFoundLetters] = useState<string[]>([]);
+  const [studyUnlocked, setStudyUnlocked] = useState(false);
+  const [keypadOpen, setKeypadOpen] = useState(false);
+  const [keypadInput, setKeypadInput] = useState("");
+  const [keypadShake, setKeypadShake] = useState(false);
+  // Flipped by the keypad-success path / re-tap of the painting. A useEffect
+  // further down picks it up and actually fires the portal entry so we
+  // don't have to reference handlers that are declared later in render.
+  const [pendingStudyEnter, setPendingStudyEnter] = useState(false);
+  const allLettersFound = foundLetters.length >= STUDY_REQUIRED_LETTERS.length;
+
+  // Throne / winner popup state machine. Fires after a successful keypad
+  // submit — checks the server-side "first solver" flag, then shows either
+  // the winner form or the "throne claimed" waitlist popup before letting
+  // the user into the 3D room.
+  type ThroneStage =
+    | "idle"
+    | "checking"
+    | "winner-form"
+    | "submitting"
+    | "won"
+    | "claimed"
+    | "waitlist-submitting"
+    | "waitlist-done"
+    | "error";
+  const [throneStage, setThroneStage] = useState<ThroneStage>("idle");
+  const [throneError, setThroneError] = useState<string | null>(null);
+  const [winnerForm, setWinnerForm] = useState({
+    name: "",
+    email: "",
+    social: "",
+    idea: "",
+  });
+  const [waitlistEmail, setWaitlistEmail] = useState("");
+
+  // Hydrate from localStorage on first mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(STUDY_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        foundLetters?: string[];
+        studyUnlocked?: boolean;
+      };
+      if (Array.isArray(saved.foundLetters)) setFoundLetters(saved.foundLetters);
+      if (saved.studyUnlocked) setStudyUnlocked(true);
+    } catch {
+      // ignore corrupt storage
+    }
+  }, []);
+
+  // Persist whenever progress changes.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      STUDY_STORAGE_KEY,
+      JSON.stringify({ foundLetters, studyUnlocked })
+    );
+  }, [foundLetters, studyUnlocked]);
+
+  const handleLetterCollect = useCallback((char: string) => {
+    setFoundLetters((prev) => (prev.includes(char) ? prev : [...prev, char]));
+  }, []);
+
+  // Left-side painting click. If the user hasn't unlocked yet → open the
+  // keypad. If already unlocked → fly straight into the 3D Founder's Study.
+  const handleStudyPortalClick = useCallback(() => {
+    if (studyUnlocked) {
+      setPendingStudyEnter(true);
+      return;
+    }
+    setKeypadOpen(true);
+    setKeypadInput("");
+  }, [studyUnlocked]);
+
+  const submitKeypad = useCallback(() => {
+    const normalized = keypadInput.replace(/-/g, "").toUpperCase();
+    if (!allLettersFound) {
+      // Refuse submissions until the user has done the hunt.
+      setKeypadShake(true);
+      setTimeout(() => setKeypadShake(false), 400);
+      return;
+    }
+    if (normalized === STUDY_CODE) {
+      setKeypadOpen(false);
+      setStudyUnlocked(true);
+      // Before flying into the 3D room, check the server to see whether
+      // this solver is the first-ever and deserves the prize popup.
+      setThroneStage("checking");
+    } else {
+      setKeypadShake(true);
+      setTimeout(() => {
+        setKeypadShake(false);
+        setKeypadInput("");
+      }, 400);
+    }
+  }, [keypadInput, allLettersFound]);
+
+  const appendKeypad = useCallback((key: string) => {
+    setKeypadInput((prev) => (prev.length >= 7 ? prev : prev + key));
+  }, []);
+  const backspaceKeypad = useCallback(() => {
+    setKeypadInput((prev) => prev.slice(0, -1));
+  }, []);
 
   // Mobile detection — on narrow viewports we swap the 3D music room for a
   // clean 2D music-app layout (no camera / free-look / floor). The 3D scene
@@ -370,6 +517,7 @@ export default function GalleryScene() {
     // Return to wherever the user was (portal stop by default, but Book works too if proximity allows)
     portalReturnStop.current = Math.max(0, Math.min(LAST, Math.round(targetRef.current)));
     setMode("manual"); // auto-tour paused during portal
+    setActivePortal("music");
     setPortalStage("entering");
     // Reset remote state — power off, start centered on the Media Board.
     setMusicRoomPower(false);
@@ -382,6 +530,159 @@ export default function GalleryScene() {
       setPortalStage((s) => (s === "entering" ? "inside" : s));
     }, PORTAL_ANIM_MS);
   }, [portalStage, fadeAudio, musicPlaying]);
+
+  // Symmetric handler for the Founder's Study portal. Uses the same camera
+  // override machinery as the music portal but flies toward STUDY_ROOM_CAMERA.
+  const handleStudyPortalEnterPortal = useCallback(() => {
+    if (portalStage !== "none") return;
+    portalReturnStop.current = Math.max(0, Math.min(LAST, Math.round(targetRef.current)));
+    setMode("manual");
+    setActivePortal("study");
+    setPortalStage("entering");
+    // Reset the study remote so every visit starts on the Welcome plaque
+    // with no book highlighted.
+    setStudyPieceIdx(STUDY_DEFAULT_PIECE_IDX);
+    setStudyBookIdx(0);
+    if (audioRef.current && musicPlaying) fadeAudio(audioRef.current, 0, 900);
+    setTimeout(() => {
+      setPortalStage((s) => (s === "entering" ? "inside" : s));
+    }, PORTAL_ANIM_MS);
+  }, [portalStage, fadeAudio, musicPlaying]);
+
+  // Study remote handlers — cycle pieces or (when Bookshelf is selected)
+  // cycle individual book titles so the label reveals each title in turn.
+  const studyBookshelfIdx = useMemo(
+    () => STUDY_PIECES.findIndex((p) => p.name === "Bookshelf"),
+    []
+  );
+  const isStudyOnBookshelf = studyPieceIdx === studyBookshelfIdx;
+  const nextStudyPiece = useCallback(() => {
+    if (studyPieceIdx === studyBookshelfIdx) {
+      setStudyBookIdx((i) => (i + 1) % STUDY_BOOK_TITLES.length);
+      return;
+    }
+    setStudyPieceIdx((i) => (i + 1) % STUDY_PIECES.length);
+  }, [studyPieceIdx, studyBookshelfIdx]);
+  const prevStudyPiece = useCallback(() => {
+    if (studyPieceIdx === studyBookshelfIdx) {
+      setStudyBookIdx(
+        (i) => (i - 1 + STUDY_BOOK_TITLES.length) % STUDY_BOOK_TITLES.length
+      );
+      return;
+    }
+    setStudyPieceIdx(
+      (i) => (i - 1 + STUDY_PIECES.length) % STUDY_PIECES.length
+    );
+  }, [studyPieceIdx, studyBookshelfIdx]);
+  // Exit book-browsing mode from the remote — next tap jumps to the next
+  // piece instead of the next book.
+  const nextStudyRoomPiece = useCallback(() => {
+    setStudyPieceIdx((i) => (i + 1) % STUDY_PIECES.length);
+  }, []);
+  const prevStudyRoomPiece = useCallback(() => {
+    setStudyPieceIdx(
+      (i) => (i - 1 + STUDY_PIECES.length) % STUDY_PIECES.length
+    );
+  }, []);
+
+  // Consume the pending-study-enter flag set by keypad success or re-tap of
+  // the already-unlocked painting. Done here (after handler definition) to
+  // avoid hoisting issues with the keypad handlers declared earlier.
+  useEffect(() => {
+    if (!pendingStudyEnter) return;
+    setPendingStudyEnter(false);
+    handleStudyPortalEnterPortal();
+  }, [pendingStudyEnter, handleStudyPortalEnterPortal]);
+
+  // Throne check — fires when the state machine enters "checking". Asks the
+  // server whether the prize has already been claimed, then routes to the
+  // appropriate popup. On network failure we fail open (skip popup, enter).
+  useEffect(() => {
+    if (throneStage !== "checking") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/throne/state", { cache: "no-store" });
+        const data = (await res.json()) as { claimed?: boolean };
+        if (cancelled) return;
+        setThroneStage(data.claimed ? "claimed" : "winner-form");
+      } catch {
+        if (cancelled) return;
+        // API unreachable — don't block entry.
+        setThroneStage("idle");
+        setPendingStudyEnter(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [throneStage]);
+
+  const submitThroneClaim = useCallback(async () => {
+    const name = winnerForm.name.trim();
+    const email = winnerForm.email.trim();
+    if (!name || !email) return;
+    setThroneStage("submitting");
+    setThroneError(null);
+    try {
+      const res = await fetch("/api/throne/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(winnerForm),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (data.ok) {
+        setThroneStage("won");
+        // Let the user read the win moment, then fly into the 3D room.
+        setTimeout(() => {
+          setThroneStage("idle");
+          setPendingStudyEnter(true);
+        }, 3000);
+      } else if (data.error === "already_claimed") {
+        // Race lost — someone else won in the last few seconds.
+        setThroneStage("claimed");
+      } else {
+        setThroneError("Couldn't submit. Please try again.");
+        setThroneStage("error");
+      }
+    } catch {
+      setThroneError("Network error. Please try again.");
+      setThroneStage("error");
+    }
+  }, [winnerForm]);
+
+  const submitThroneWaitlist = useCallback(async () => {
+    const email = waitlistEmail.trim();
+    if (!email) return;
+    setThroneStage("waitlist-submitting");
+    setThroneError(null);
+    try {
+      const res = await fetch("/api/throne/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = (await res.json()) as { ok?: boolean };
+      if (data.ok) {
+        setThroneStage("waitlist-done");
+        setTimeout(() => {
+          setThroneStage("idle");
+          setPendingStudyEnter(true);
+        }, 2000);
+      } else {
+        setThroneError("Couldn't join the waitlist.");
+        setThroneStage("error");
+      }
+    } catch {
+      setThroneError("Network error.");
+      setThroneStage("error");
+    }
+  }, [waitlistEmail]);
+
+  const skipThronePopup = useCallback(() => {
+    setThroneStage("idle");
+    setPendingStudyEnter(true);
+  }, []);
 
   // Music-room remote handlers. Next/prev cycle through MUSIC_ROOM_PIECES;
   // togglePower flips audio for the currently-selected TV (handled in
@@ -399,6 +700,13 @@ export default function GalleryScene() {
   const toggleMusicPower = useCallback(() => setMusicRoomPower((p) => !p), []);
 
   const musicRoomLookAt = MUSIC_ROOM_PIECES[musicRoomPieceIdx].lookAt;
+  // Generic portal target — whichever hidden-room piece is selected.
+  const portalTargetLookAt: [number, number, number] | null =
+    portalStage === "inside"
+      ? activePortal === "study"
+        ? STUDY_PIECES[studyPieceIdx].lookAt
+        : musicRoomLookAt
+      : null;
 
   const handlePortalExit = useCallback(() => {
     if (portalStage !== "inside") return;
@@ -410,6 +718,7 @@ export default function GalleryScene() {
     if (audioRef.current && musicPlaying) fadeAudio(audioRef.current, 0.3, 900);
     setTimeout(() => {
       setPortalStage("none");
+      setActivePortal(null);
     }, PORTAL_ANIM_MS);
   }, [portalStage, fadeAudio, updateTarget, musicPlaying]);
 
@@ -517,13 +826,20 @@ export default function GalleryScene() {
     snapRef.current = true;
   }, [updateTarget, setAutoTour]);
 
-  // Override camera target derived from portal stage. null = STOPS drive the camera.
-  const portalOverride =
-    portalStage === "entering" || portalStage === "inside"
-      ? MUSIC_ROOM_CAMERA
-      : portalStage === "exiting"
-        ? { pos: STOPS[portalReturnStop.current].pos, lookAt: STOPS[portalReturnStop.current].lookAt }
-        : null;
+  // Override camera target derived from portal stage + which portal is
+  // active. null = STOPS drive the camera.
+  const portalOverride = (() => {
+    if (portalStage === "exiting") {
+      return {
+        pos: STOPS[portalReturnStop.current].pos,
+        lookAt: STOPS[portalReturnStop.current].lookAt,
+      };
+    }
+    if (portalStage === "entering" || portalStage === "inside") {
+      return activePortal === "study" ? STUDY_ROOM_CAMERA : MUSIC_ROOM_CAMERA;
+    }
+    return null;
+  })();
 
   return (
     <div className="fixed inset-0">
@@ -557,9 +873,17 @@ export default function GalleryScene() {
             onDirectSnapDone={handleDirectSnapDone}
             onPortalProximityChange={setPortalReady}
             freeLook={portalStage === "inside"}
-            musicRoomTargetLookAt={portalStage === "inside" ? musicRoomLookAt : null}
+            musicRoomTargetLookAt={portalTargetLookAt}
             musicRoomPower={musicRoomPower}
             musicRoomPieceIdx={musicRoomPieceIdx}
+            studyPieceIdx={studyPieceIdx}
+            studyHighlightedBookIdx={isStudyOnBookshelf ? studyBookIdx : -1}
+            hiddenLetters={studyUnlocked ? [] : HIDDEN_LETTERS}
+            foundLetters={foundLetters}
+            onLetterCollect={handleLetterCollect}
+            onStudyPortalClick={handleStudyPortalClick}
+            activePortal={activePortal}
+            onHireMe={() => setActivePanel("commission")}
           />
         </Suspense>
       </Canvas>
@@ -675,12 +999,31 @@ export default function GalleryScene() {
         )}
       </AnimatePresence>
 
+      {/* "Press E" hint — fades in when the camera is close enough to the
+          chess-king portal painting. Desktop-only (mobile uses triple-tap). */}
+      <AnimatePresence>
+        {portalReady && entered && !portalActive && !anyOverlayOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.3 }}
+            className="pointer-events-none fixed bottom-20 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-gallery-accent/30 bg-black/60 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.25em] text-gallery-accent backdrop-blur-sm md:flex"
+          >
+            <span className="rounded border border-gallery-accent/50 px-1.5 py-0.5 font-mono text-[10px] leading-none text-gallery-accent">
+              E
+            </span>
+            <span>Press to enter</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Music-room — mobile 2D overlay. On narrow viewports we replace the
           3D room with a clean vertical music-app layout: scrollable media
           stack + a fixed bottom nav with the Exit control. The 3D scene
           keeps running behind the overlay so portal enter/exit still works. */}
       <AnimatePresence>
-        {isMobile && portalStage !== "none" && (
+        {isMobile && portalStage !== "none" && activePortal === "music" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -774,7 +1117,7 @@ export default function GalleryScene() {
           through all 7 pieces in left-to-right pan order. Desktop only; the
           mobile layout above has its own inline controls. */}
       <AnimatePresence>
-        {portalStage === "inside" && !isMobile && (
+        {portalStage === "inside" && !isMobile && activePortal === "music" && (
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -837,6 +1180,564 @@ export default function GalleryScene() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Study remote — prev/next cycles through the 5 study pieces. When
+          the Bookshelf piece is selected, the arrows switch context and
+          cycle through the 21 book titles (with the matching book glowing
+          gold in 3D). A small "Room" button exits book-browse mode. */}
+      <AnimatePresence>
+        {portalStage === "inside" && activePortal === "study" && (
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 18 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed bottom-8 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border border-[#00d9ff]/30 bg-[#0a0f1e]/95 px-3 py-2 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          >
+            {/* Prev */}
+            <button
+              onClick={prevStudyPiece}
+              aria-label={isStudyOnBookshelf ? "Previous book" : "Previous piece"}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-gallery-light transition-all hover:border-[#00d9ff]/40 hover:text-[#00d9ff]"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            {/* Piece / book label */}
+            <div className="flex min-w-[160px] flex-col items-center px-2">
+              <span className="text-[8px] font-medium uppercase tracking-[0.3em] text-gallery-muted/70">
+                {isStudyOnBookshelf ? "Currently Viewing" : "Now Viewing"}
+              </span>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={
+                    isStudyOnBookshelf
+                      ? `book-${studyBookIdx}`
+                      : `piece-${studyPieceIdx}`
+                  }
+                  initial={{ opacity: 0, y: -3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 3 }}
+                  transition={{ duration: 0.18 }}
+                  className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#7ee6ff]"
+                >
+                  {isStudyOnBookshelf
+                    ? STUDY_BOOK_TITLES[studyBookIdx]
+                    : STUDY_PIECES[studyPieceIdx].name}
+                </motion.span>
+              </AnimatePresence>
+              {isStudyOnBookshelf && (
+                <span className="text-[7px] uppercase tracking-[0.3em] text-gallery-muted/50">
+                  Book {studyBookIdx + 1} / {STUDY_BOOK_TITLES.length}
+                </span>
+              )}
+            </div>
+
+            {/* Next */}
+            <button
+              onClick={nextStudyPiece}
+              aria-label={isStudyOnBookshelf ? "Next book" : "Next piece"}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.04] text-gallery-light transition-all hover:border-[#00d9ff]/40 hover:text-[#00d9ff]"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+
+            {/* Room-piece shortcut buttons — always visible so the user can
+                exit the book-browser context and jump to any piece by name. */}
+            <div className="ml-1 flex items-center gap-1 border-l border-white/10 pl-2">
+              <button
+                onClick={prevStudyRoomPiece}
+                aria-label="Previous room piece"
+                title="Previous room piece"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-[9px] uppercase tracking-wider text-gallery-muted transition-all hover:border-[#00d9ff]/40 hover:text-[#00d9ff]"
+              >
+                ‹
+              </button>
+              <span className="px-1 text-[7px] font-medium uppercase tracking-[0.25em] text-gallery-muted/60">
+                Room
+              </span>
+              <button
+                onClick={nextStudyRoomPiece}
+                aria-label="Next room piece"
+                title="Next room piece"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-[9px] uppercase tracking-wider text-gallery-muted transition-all hover:border-[#00d9ff]/40 hover:text-[#00d9ff]"
+              >
+                ›
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Scavenger-hunt HUD — subtle code tracker that appears once the user
+          has collected at least one letter. Shows fixed scaffolding (dash and
+          double-zero) plus blanks for the 4 findable characters. Hidden once
+          the study is unlocked. */}
+      <AnimatePresence>
+        {entered && !studyUnlocked && foundLetters.length > 0 && !portalActive && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-14 right-4 z-20 rounded-lg border border-gallery-accent/25 bg-[#0c0a08]/90 px-3 py-2 backdrop-blur-md"
+          >
+            <div className="text-[8px] font-medium uppercase tracking-[0.3em] text-gallery-muted/80">
+              Code
+            </div>
+            <div className="mt-1 flex gap-1 font-mono text-[14px] tracking-[0.18em] text-gallery-accent">
+              {(["D", "E", "V", "-", "0", "0", "7"] as const).map((ch, i) => {
+                const isFixed = ch === "-" || ch === "0";
+                const isFound = foundLetters.includes(ch);
+                return (
+                  <span
+                    key={`${ch}-${i}`}
+                    className={
+                      isFixed
+                        ? "text-gallery-accent/50"
+                        : isFound
+                        ? "text-gallery-accent"
+                        : "text-gallery-muted/40"
+                    }
+                  >
+                    {isFixed ? ch : isFound ? ch : "_"}
+                  </span>
+                );
+              })}
+            </div>
+            <div className="mt-1 text-[8px] uppercase tracking-[0.25em] text-gallery-muted/60">
+              {foundLetters.length} / {STUDY_REQUIRED_LETTERS.length} found
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Throne popup — shows after a successful keypad unlock. Different
+          content per state-machine stage: checking / winner-form / submitting
+          / won / claimed (with waitlist) / waitlist states / error. */}
+      <AnimatePresence>
+        {throneStage !== "idle" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mx-6 w-full max-w-[500px] rounded-2xl border border-gallery-accent/30 bg-[#0c0a08]/95 p-8 text-center shadow-[0_24px_72px_rgba(0,0,0,0.7)]"
+            >
+              {throneStage === "checking" && (
+                <div className="py-8">
+                  <div className="mb-3 text-[10px] font-medium uppercase tracking-[0.35em] text-gallery-accent">
+                    Verifying
+                  </div>
+                  <p className="text-sm text-gallery-light">Checking the throne…</p>
+                </div>
+              )}
+
+              {throneStage === "winner-form" && (
+                <>
+                  <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.35em] text-gallery-accent">
+                    First Solver
+                  </div>
+                  <h2 className="mb-3 text-2xl font-light tracking-[0.1em] text-gallery-white">
+                    You cracked the code.
+                  </h2>
+                  <p className="mb-6 text-[13px] leading-relaxed text-gallery-light">
+                    You're the first person to solve the scavenger hunt.
+                    Your prize: <span className="text-gallery-accent">you get to design the next hidden room</span>.
+                    Claim it below — we'll follow up by email with the full brief.
+                  </p>
+                  <div className="space-y-3 text-left">
+                    <div>
+                      <label className="mb-1 block text-[9px] font-medium uppercase tracking-[0.2em] text-gallery-muted">
+                        Name
+                      </label>
+                      <input
+                        type="text"
+                        value={winnerForm.name}
+                        onChange={(e) => setWinnerForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="Your full name"
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gallery-white placeholder-gallery-muted/40 outline-none focus:border-gallery-accent/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[9px] font-medium uppercase tracking-[0.2em] text-gallery-muted">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={winnerForm.email}
+                        onChange={(e) => setWinnerForm((f) => ({ ...f, email: e.target.value }))}
+                        placeholder="your@email.com"
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gallery-white placeholder-gallery-muted/40 outline-none focus:border-gallery-accent/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[9px] font-medium uppercase tracking-[0.2em] text-gallery-muted">
+                        Social Link <span className="opacity-60">(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={winnerForm.social}
+                        onChange={(e) => setWinnerForm((f) => ({ ...f, social: e.target.value }))}
+                        placeholder="X / LinkedIn / portfolio URL"
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gallery-white placeholder-gallery-muted/40 outline-none focus:border-gallery-accent/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-[9px] font-medium uppercase tracking-[0.2em] text-gallery-muted">
+                        One-Sentence Room Idea <span className="opacity-60">(optional)</span>
+                      </label>
+                      <textarea
+                        value={winnerForm.idea}
+                        onChange={(e) => setWinnerForm((f) => ({ ...f, idea: e.target.value }))}
+                        rows={2}
+                        placeholder="A candlelit library where every book is a secret…"
+                        className="w-full resize-none rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gallery-white placeholder-gallery-muted/40 outline-none focus:border-gallery-accent/40"
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-[10px] uppercase tracking-[0.2em] text-gallery-muted/70">
+                    Claim within 24 hours
+                  </p>
+                  <div className="mt-5 flex gap-3">
+                    <button
+                      onClick={skipThronePopup}
+                      className="flex-1 rounded-full border border-white/15 py-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-muted transition-colors hover:text-gallery-light"
+                    >
+                      Skip
+                    </button>
+                    <button
+                      onClick={submitThroneClaim}
+                      disabled={!winnerForm.name.trim() || !winnerForm.email.trim()}
+                      className="flex-1 rounded-full bg-gallery-accent py-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-black transition-colors hover:bg-gallery-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Claim the Throne
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {throneStage === "submitting" && (
+                <div className="py-8">
+                  <div className="mb-3 text-[10px] font-medium uppercase tracking-[0.35em] text-gallery-accent">
+                    Claiming
+                  </div>
+                  <p className="text-sm text-gallery-light">Locking in your claim…</p>
+                </div>
+              )}
+
+              {throneStage === "won" && (
+                <div className="py-4">
+                  <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.35em] text-gallery-accent">
+                    Claimed
+                  </div>
+                  <h2 className="mb-3 text-2xl font-light tracking-[0.1em] text-gallery-white">
+                    The throne is yours.
+                  </h2>
+                  <p className="text-[13px] leading-relaxed text-gallery-light">
+                    Coach B will follow up by email with the design brief.
+                    Stepping into the study now…
+                  </p>
+                </div>
+              )}
+
+              {throneStage === "claimed" && (
+                <>
+                  <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.35em] text-gallery-accent">
+                    Throne Claimed
+                  </div>
+                  <h2 className="mb-3 text-xl font-light tracking-[0.1em] text-gallery-white">
+                    You found the code — but the throne has been claimed.
+                  </h2>
+                  <p className="mb-5 text-[13px] leading-relaxed text-gallery-light">
+                    Someone got here first this time. Join the waitlist and
+                    you'll be first in line for future rooms and challenges.
+                  </p>
+                  <div className="text-left">
+                    <label className="mb-1 block text-[9px] font-medium uppercase tracking-[0.2em] text-gallery-muted">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={waitlistEmail}
+                      onChange={(e) => setWaitlistEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gallery-white placeholder-gallery-muted/40 outline-none focus:border-gallery-accent/40"
+                    />
+                  </div>
+                  <div className="mt-5 flex gap-3">
+                    <button
+                      onClick={skipThronePopup}
+                      className="flex-1 rounded-full border border-white/15 py-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-muted transition-colors hover:text-gallery-light"
+                    >
+                      No Thanks
+                    </button>
+                    <button
+                      onClick={submitThroneWaitlist}
+                      disabled={!waitlistEmail.trim()}
+                      className="flex-1 rounded-full bg-gallery-accent py-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-black transition-colors hover:bg-gallery-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Join Waitlist
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {throneStage === "waitlist-submitting" && (
+                <div className="py-8">
+                  <p className="text-sm text-gallery-light">Adding you…</p>
+                </div>
+              )}
+
+              {throneStage === "waitlist-done" && (
+                <div className="py-4">
+                  <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.35em] text-gallery-accent">
+                    You're in
+                  </div>
+                  <h2 className="mb-3 text-xl font-light tracking-[0.1em] text-gallery-white">
+                    Welcome to the waitlist.
+                  </h2>
+                  <p className="text-[13px] leading-relaxed text-gallery-light">
+                    You'll hear from Coach B for the next challenge.
+                    Stepping into the study…
+                  </p>
+                </div>
+              )}
+
+              {throneStage === "error" && (
+                <>
+                  <div className="mb-2 text-[10px] font-medium uppercase tracking-[0.35em] text-red-400/80">
+                    Something went wrong
+                  </div>
+                  <p className="mb-5 text-[13px] leading-relaxed text-gallery-light">
+                    {throneError || "Please try again."}
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={skipThronePopup}
+                      className="flex-1 rounded-full border border-white/15 py-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-muted"
+                    >
+                      Enter the Study
+                    </button>
+                    <button
+                      onClick={() => setThroneStage("checking")}
+                      className="flex-1 rounded-full bg-gallery-accent py-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-black"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Keypad modal — opens when the user taps the left-side.png painting.
+          Unified 4×4 grid: digits on the left 3 columns, earned letters
+          appear on the right column in their code positions (D/E/V top→
+          bottom). Auto-dash input display + status message that explains
+          why submit is blocked when the scavenger hunt isn't complete. */}
+      <AnimatePresence>
+        {keypadOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            onClick={() => setKeypadOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1, x: keypadShake ? [0, -8, 8, -8, 8, 0] : 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: keypadShake ? 0.4 : 0.3 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-[320px] rounded-2xl border border-gallery-accent/30 bg-[#0c0a08]/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
+            >
+              <div className="mb-1 text-center text-[9px] font-medium uppercase tracking-[0.35em] text-gallery-accent/80">
+                Founder's Study
+              </div>
+              <h3 className="mb-4 text-center text-[13px] font-medium uppercase tracking-[0.2em] text-gallery-white">
+                Enter Access Code
+              </h3>
+
+              {/* Input display — auto-dashes after position 3 (D E V - 0 0 7) */}
+              <div className="mb-3 flex h-12 items-center justify-center rounded-lg border border-white/10 bg-black/40 font-mono text-[18px] tracking-[0.22em] text-gallery-accent">
+                {(() => {
+                  const positions = [0, 1, 2, 3, 4, 5];
+                  return (
+                    <div className="flex items-center gap-1">
+                      {positions.map((pos) => {
+                        // Insert visual dash before position 3 (between DEV and 007).
+                        const dashBefore = pos === 3;
+                        const char = keypadInput[pos];
+                        return (
+                          <span key={pos} className="flex items-center gap-1">
+                            {dashBefore && (
+                              <span className={char !== undefined ? "text-gallery-accent/70" : "text-gallery-muted/40"}>
+                                -
+                              </span>
+                            )}
+                            <span className={char ? "text-gallery-accent" : "text-gallery-muted/30"}>
+                              {char ?? "_"}
+                            </span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Status line — always visible, explains what's required */}
+              <div className="mb-4 flex min-h-[16px] items-center justify-center text-center text-[9px] uppercase tracking-[0.25em]">
+                {allLettersFound ? (
+                  <span className="text-gallery-muted/60">Enter the 6-digit code</span>
+                ) : (
+                  <span className="text-amber-300/70">
+                    Collect all {STUDY_REQUIRED_LETTERS.length} letters first
+                    <span className="ml-2 text-gallery-muted/50">
+                      ({foundLetters.length}/{STUDY_REQUIRED_LETTERS.length})
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              {/* Unified 4-column pad — digits 1-9 on the left 3 columns,
+                  earned letters on the right column (D/E/V), Del/0/Enter
+                  on the last row. Letter slots stay empty until found. */}
+              <div className="grid grid-cols-4 gap-2">
+                {/* Row 1 */}
+                <button
+                  onClick={() => appendKeypad("1")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  1
+                </button>
+                <button
+                  onClick={() => appendKeypad("2")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  2
+                </button>
+                <button
+                  onClick={() => appendKeypad("3")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  3
+                </button>
+                {foundLetters.includes("D") ? (
+                  <button
+                    onClick={() => appendKeypad("D")}
+                    className="rounded-lg border border-gallery-accent/40 bg-gallery-accent/10 py-3 text-[16px] font-medium text-gallery-accent transition-colors hover:bg-gallery-accent/20"
+                  >
+                    D
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                {/* Row 2 */}
+                <button
+                  onClick={() => appendKeypad("4")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  4
+                </button>
+                <button
+                  onClick={() => appendKeypad("5")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  5
+                </button>
+                <button
+                  onClick={() => appendKeypad("6")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  6
+                </button>
+                {foundLetters.includes("E") ? (
+                  <button
+                    onClick={() => appendKeypad("E")}
+                    className="rounded-lg border border-gallery-accent/40 bg-gallery-accent/10 py-3 text-[16px] font-medium text-gallery-accent transition-colors hover:bg-gallery-accent/20"
+                  >
+                    E
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                {/* Row 3 */}
+                <button
+                  onClick={() => appendKeypad("7")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  7
+                </button>
+                <button
+                  onClick={() => appendKeypad("8")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  8
+                </button>
+                <button
+                  onClick={() => appendKeypad("9")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  9
+                </button>
+                {foundLetters.includes("V") ? (
+                  <button
+                    onClick={() => appendKeypad("V")}
+                    className="rounded-lg border border-gallery-accent/40 bg-gallery-accent/10 py-3 text-[16px] font-medium text-gallery-accent transition-colors hover:bg-gallery-accent/20"
+                  >
+                    V
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                {/* Row 4 — Del, 0, Enter (spans 2) */}
+                <button
+                  onClick={backspaceKeypad}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[12px] uppercase tracking-wider text-gallery-muted transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  Del
+                </button>
+                <button
+                  onClick={() => appendKeypad("0")}
+                  className="rounded-lg border border-white/10 bg-white/[0.03] py-3 text-[16px] font-medium text-gallery-light transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent"
+                >
+                  0
+                </button>
+                <button
+                  onClick={submitKeypad}
+                  className={`col-span-2 rounded-lg py-3 text-[11px] font-medium uppercase tracking-[0.2em] transition-all ${
+                    allLettersFound
+                      ? "bg-gallery-accent text-gallery-black hover:bg-gallery-accent/90"
+                      : "bg-gallery-accent/25 text-gallery-accent/60 cursor-not-allowed"
+                  }`}
+                >
+                  Enter
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

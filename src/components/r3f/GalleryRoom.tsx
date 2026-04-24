@@ -9,10 +9,12 @@ import { TDSLoader } from "three/examples/jsm/loaders/TDSLoader.js";
 import { Project } from "../gallery/ProjectModal";
 import WallArtwork from "./WallArtwork";
 import SpotLightWithTarget from "./SpotLightWithTarget";
+import HiddenLetter from "./HiddenLetter";
 import { DiamondPedestal, EnvelopePedestal, PhonePedestal, ConnectPedestal } from  "./ServicePedestal";
 
 // Lazy-loaded — not bundled with initial gallery payload
 const MusicRoom = dynamic(() => import("./MusicRoom"), { ssr: false });
+const FoundersStudy = dynamic(() => import("./FoundersStudy"), { ssr: false });
 import TechVault from "./TechVault";
 
 /* ------------------------------------------------------------------ */
@@ -109,6 +111,9 @@ interface ArtworkDef {
   frame: "square" | "landscape" | "portrait";
   project: Project;
   isPortal?: boolean;
+  /** Tagged true for the left-side.png painting so clicking it opens the
+   *  Founder's Study keypad instead of a project modal. */
+  isStudyPortal?: boolean;
   noPlaque?: boolean;
   noLight?: boolean;
   noInteraction?: boolean;
@@ -166,11 +171,11 @@ const ARTWORKS: ArtworkDef[] = [
   // Wall spans z from -4 to +1 (width 5m, centered at z = GZ = -1.5).
   // Centers at z = -3, -1.5, 0 → 1.5m between each.
 
-  // Left image — decorative only, no interaction
+  // Left image — Founder's Study scavenger-hunt portal (click opens keypad)
   { position: [19, 1.85, -3], rotation: [0, -Math.PI / 2, 0], width: 0.8, frame: "portrait",
     noPlaque: true,
     noLight: true,
-    noInteraction: true,
+    isStudyPortal: true,
     project: { title: "__leftImage", category: "", image: "/images/left-side.png",
       description: "", tags: [] }},
 
@@ -350,6 +355,27 @@ interface GalleryRoomProps {
   musicRoomPower?: boolean;
   /** Currently selected piece index forwarded to MusicRoom. */
   musicRoomPieceIdx?: number;
+  /** Hidden-letter placements for the Founder's Study scavenger hunt. */
+  hiddenLetters?: ReadonlyArray<{
+    char: string;
+    position: [number, number, number];
+    rotation?: [number, number, number];
+    size?: number;
+  }>;
+  /** Characters the user has already collected (hides those letters in 3D). */
+  foundLetters?: ReadonlyArray<string>;
+  /** Fires when a hidden letter is clicked/tapped. */
+  onLetterCollect?: (char: string) => void;
+  /** Fires when the user taps the left-side.png (Founder's Study) painting. */
+  onStudyPortalClick?: () => void;
+  /** Which hidden portal is currently active (drives which room to mount). */
+  activePortal?: "music" | "study" | null;
+  /** Fires when the in-study HIRE ME sign is clicked. */
+  onHireMe?: () => void;
+  /** Currently selected study piece idx (drives lerp reactivation). */
+  studyPieceIdx?: number;
+  /** Index of the currently-highlighted book on the shelf (-1 = none). */
+  studyHighlightedBookIdx?: number;
 }
 
 export default function GalleryRoom({
@@ -375,6 +401,14 @@ export default function GalleryRoom({
   musicRoomTargetLookAt = null,
   musicRoomPower = false,
   musicRoomPieceIdx = 3,
+  hiddenLetters = [],
+  foundLetters = [],
+  onLetterCollect,
+  onStudyPortalClick,
+  activePortal = null,
+  onHireMe,
+  studyPieceIdx = 0,
+  studyHighlightedBookIdx = -1,
 }: GalleryRoomProps) {
   const { camera } = useThree();
 
@@ -438,7 +472,7 @@ export default function GalleryRoom({
   const draggingRef = useRef(false);
   useEffect(() => {
     remoteLerpActive.current = true;
-  }, [musicRoomPieceIdx]);
+  }, [musicRoomPieceIdx, studyPieceIdx]);
 
   const wallTex = useTexture("/images/gallery/wall.jpg");
   const floorTex = useTexture("/images/gallery/floor.jpg");
@@ -777,6 +811,7 @@ export default function GalleryRoom({
             onClick={() => {
               if (art.noInteraction) return;
               if (art.isPortal) onPortalEnter?.();
+              else if (art.isStudyPortal) onStudyPortalClick?.();
               else onSelectProject(art.project);
             }}
             isActive={isFocused}
@@ -787,13 +822,31 @@ export default function GalleryRoom({
         );
       })}
 
-      {/* Hidden Music Room — only mounted once the portal has been triggered */}
-      {portalActive && (
+      {/* Hidden letters for the Founder's Study scavenger hunt — removed
+          once collected. Skipped entirely once the study is already unlocked. */}
+      {!cameraDisabled &&
+        hiddenLetters.map((l) => (
+          <HiddenLetter
+            key={l.char}
+            char={l.char}
+            position={l.position}
+            rotation={l.rotation}
+            size={l.size}
+            found={foundLetters.includes(l.char)}
+            onCollect={(c) => onLetterCollect?.(c)}
+          />
+        ))}
+
+      {/* Hidden rooms — only the portal that was activated mounts its room. */}
+      {portalActive && activePortal === "music" && (
         <MusicRoom
           onOpenPanel={onOpenPanel}
           powerOn={musicRoomPower}
           currentPieceIdx={musicRoomPieceIdx}
         />
+      )}
+      {portalActive && activePortal === "study" && (
+        <FoundersStudy onHireMe={onHireMe} highlightedBookIdx={studyHighlightedBookIdx} />
       )}
 
       {/* Tech Vault — dedicated alcove branching off the top wall at x=3..4 */}
