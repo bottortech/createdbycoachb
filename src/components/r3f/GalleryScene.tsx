@@ -1012,11 +1012,11 @@ export default function GalleryScene() {
       <AnimatePresence>
         {huntHintVisible && entered && !studyUnlocked && !portalActive && !anyOverlayOpen && (
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed bottom-16 left-4 z-30 w-[280px] rounded-xl border border-gallery-accent/30 bg-[#0c0a08]/95 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+            className="fixed top-16 right-4 z-30 w-[280px] rounded-xl border border-gallery-accent/30 bg-[#0c0a08]/95 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl"
           >
             <button
               onClick={dismissHuntHint}
