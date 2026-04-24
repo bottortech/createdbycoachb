@@ -1037,8 +1037,8 @@ export default function GalleryScene() {
               Find the code.
             </h3>
             <p className="text-[11px] leading-relaxed text-gallery-muted">
-              Four letters are hidden around the gallery. Collect them all,
-              enter the code, and unlock the Founder's Study.
+              Three letters and one number are hidden around the gallery.
+              Collect them all, enter the code, and unlock the Founder's Study.
               <span className="mt-1 block text-gallery-accent/80">
                 First to solve wins a prize.
               </span>
@@ -1689,7 +1689,7 @@ export default function GalleryScene() {
                   <span className="text-gallery-muted/60">Enter the 6-digit code</span>
                 ) : (
                   <span className="text-amber-300/70">
-                    Collect all {STUDY_REQUIRED_LETTERS.length} letters first
+                    Collect 3 letters and 1 number first
                     <span className="ml-2 text-gallery-muted/50">
                       ({foundLetters.length}/{STUDY_REQUIRED_LETTERS.length})
                     </span>
