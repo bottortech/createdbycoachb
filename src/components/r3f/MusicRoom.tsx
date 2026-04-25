@@ -137,8 +137,9 @@ interface AlbumPieceProps {
   rotation: [number, number, number];
   texture: THREE.Texture;
   label: string;
+  onClick?: () => void;
 }
-function AlbumPiece({ position, rotation, texture, label }: AlbumPieceProps) {
+function AlbumPiece({ position, rotation, texture, label, onClick }: AlbumPieceProps) {
   const W = 1.4; // outer frame width
   const H = 1.4; // outer frame height
   const FRAME = 0.09; // visible gilt border thickness
@@ -158,8 +159,22 @@ function AlbumPiece({ position, rotation, texture, label }: AlbumPieceProps) {
         <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.28} />
       </mesh>
 
-      {/* Album artwork — on top of the gilt border, showing the border around it */}
-      <mesh position={[0, 0, 0.024]}>
+      {/* Album artwork — clickable. Tapping opens a piece modal so users
+          can read the title + description like main-gallery pieces. */}
+      <mesh
+        position={[0, 0, 0.024]}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          if (onClick) document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = "default";
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
+      >
         <planeGeometry args={[ART, ART]} />
         <meshStandardMaterial map={texture} roughness={0.5} />
       </mesh>
@@ -281,9 +296,12 @@ interface Props {
   powerOn?: boolean;
   /** Index of the currently selected piece (0..6). See MUSIC_ROOM_*_TV_IDX. */
   currentPieceIdx?: number;
+  /** Fires when an album frame is clicked. The parent surfaces this as
+   *  a piece modal (same UX as main-gallery pieces). */
+  onAlbumClick?: (albumIdx: number) => void;
 }
 
-export default function MusicRoom({ powerOn = false, currentPieceIdx = 3 }: Props) {
+export default function MusicRoom({ powerOn = false, currentPieceIdx = 3, onAlbumClick }: Props) {
   const wallTex = useTexture("/images/gallery/wall.jpg");
   const ceilingTex = useTexture("/images/gallery/ceiling.jpg");
   const marbleTex = useMemo(() => createMarbleTexture(), []);
@@ -473,12 +491,14 @@ export default function MusicRoom({ powerOn = false, currentPieceIdx = 3 }: Prop
         rotation={[0, 0, 0]}
         texture={album1Tex}
         label="ALBUM I"
+        onClick={onAlbumClick ? () => onAlbumClick(0) : undefined}
       />
       <AlbumPiece
         position={[31.5, 1.7, Z_MIN + 0.02]}
         rotation={[0, 0, 0]}
         texture={album2Tex}
         label="ALBUM II"
+        onClick={onAlbumClick ? () => onAlbumClick(1) : undefined}
       />
       {/* North wall (z = Z_MAX), faces -z */}
       <AlbumPiece
@@ -486,12 +506,14 @@ export default function MusicRoom({ powerOn = false, currentPieceIdx = 3 }: Prop
         rotation={[0, Math.PI, 0]}
         texture={album3Tex}
         label="ALBUM III"
+        onClick={onAlbumClick ? () => onAlbumClick(2) : undefined}
       />
       <AlbumPiece
         position={[31.5, 1.7, Z_MAX - 0.02]}
         rotation={[0, Math.PI, 0]}
         texture={album4Tex}
         label="ALBUM IV"
+        onClick={onAlbumClick ? () => onAlbumClick(3) : undefined}
       />
 
       {/* ====== MEDIA BOARD — mounted flush to the back wall ======

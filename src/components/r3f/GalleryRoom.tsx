@@ -15,6 +15,13 @@ import { DiamondPedestal, EnvelopePedestal, PhonePedestal, ConnectPedestal } fro
 // Lazy-loaded — not bundled with initial gallery payload
 const MusicRoom = dynamic(() => import("./MusicRoom"), { ssr: false });
 const FoundersStudy = dynamic(() => import("./FoundersStudy"), { ssr: false });
+// TributeRoom: switched from dynamic() to a regular import. The dynamic +
+// Suspense wrapper was sometimes leaving the room blank on entry while the
+// chunk loaded; with a static import, the component is in the bundle by
+// the time the portal activates and there's no Suspense boundary to fall
+// back to null.
+import TributeRoom from "./TributeRoom";
+import TributeLantern from "./TributeLantern";
 import TechVault from "./TechVault";
 
 /* ------------------------------------------------------------------ */
@@ -369,13 +376,15 @@ interface GalleryRoomProps {
   /** Fires when the user taps the left-side.png (Founder's Study) painting. */
   onStudyPortalClick?: () => void;
   /** Which hidden portal is currently active (drives which room to mount). */
-  activePortal?: "music" | "study" | null;
+  activePortal?: "music" | "study" | "tribute" | null;
   /** Fires when the in-study HIRE ME sign is clicked. */
   onHireMe?: () => void;
   /** Currently selected study piece idx (drives lerp reactivation). */
   studyPieceIdx?: number;
   /** Index of the currently-highlighted book on the shelf (-1 = none). */
   studyHighlightedBookIdx?: number;
+  /** Fires when the floating tribute lantern hidden in the gallery is tapped. */
+  onTributePortalClick?: () => void;
 }
 
 export default function GalleryRoom({
@@ -409,6 +418,7 @@ export default function GalleryRoom({
   onHireMe,
   studyPieceIdx = 0,
   studyHighlightedBookIdx = -1,
+  onTributePortalClick,
 }: GalleryRoomProps) {
   const { camera } = useThree();
 
@@ -843,10 +853,70 @@ export default function GalleryRoom({
           onOpenPanel={onOpenPanel}
           powerOn={musicRoomPower}
           currentPieceIdx={musicRoomPieceIdx}
+          onAlbumClick={(idx) => {
+            const albums: Project[] = [
+              {
+                title: "Album I — Burgundy",
+                category: "Music · Manny Baby",
+                image: "/images/Wiggle-Woo-Character.png",
+                description:
+                  "First in the rotation. A mood piece — warm, late-night, conversational. The deep burgundy on the wall is the sound: heavy bass, soft synths, slow tempo.",
+                tags: ["Music", "Manny Baby"],
+              },
+              {
+                title: "Album II — Deep Blue",
+                category: "Music · Manny Baby",
+                image: "/images/Wiggle-Woo-Character.png",
+                description:
+                  "Cooler, more reflective. Pulled apart and put back together — the kind of album that sounds different the third time you hear it.",
+                tags: ["Music", "Manny Baby"],
+              },
+              {
+                title: "Album III — Warm Brown",
+                category: "Music · Manny Baby",
+                image: "/images/Wiggle-Woo-Character.png",
+                description:
+                  "Richer, denser. Studio-leaning. Live drums where you'd expect samples, vocals layered for warmth.",
+                tags: ["Music", "Manny Baby"],
+              },
+              {
+                title: "Album IV — Forest Green",
+                category: "Music · Manny Baby",
+                image: "/images/Wiggle-Woo-Character.png",
+                description:
+                  "The newest. Looser, riskier, more confident. Listen end-to-end — the sequencing is the point.",
+                tags: ["Music", "Manny Baby"],
+              },
+            ];
+            const album = albums[idx];
+            if (album) onSelectProject(album);
+          }}
         />
       )}
       {portalActive && activePortal === "study" && (
         <FoundersStudy onHireMe={onHireMe} highlightedBookIdx={studyHighlightedBookIdx} />
+      )}
+      {portalActive && activePortal === "tribute" && (
+        <TributeRoom
+          onPhotoClick={() =>
+            onSelectProject({
+              title: "Jamal Brown",
+              category: "1997 — 2021",
+              image: "/images/brother.jpg",
+              description:
+                "A quiet place in his memory — built into a corner of this gallery. He loved anime, and the soft worlds it carried him to. This room borrows that calm. He's still here in the work.",
+              tags: ["In Memory", "Forever Loved"],
+            })
+          }
+        />
+      )}
+
+      {/* Tribute room access — a small floating paper lantern hovering
+          quietly above the goat statue. Subtle by design; clicking it
+          flies the camera into the Tribute Room. Always present on the
+          main gallery floor. */}
+      {!cameraDisabled && (
+        <TributeLantern position={[10, 2.95, -1.5]} onClick={onTributePortalClick} />
       )}
 
       {/* Tech Vault — dedicated alcove branching off the top wall at x=3..4 */}

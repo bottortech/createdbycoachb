@@ -7,6 +7,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
 import { SPOTIFY_SRC, TV_LEFT_YT, TV_RIGHT_YT, APPLE_URL } from "./MusicRoom";
 import { STUDY_ROOM_CAMERA, STUDY_PIECES, STUDY_DEFAULT_PIECE_IDX, STUDY_BOOK_TITLES } from "./FoundersStudy";
+import {
+  TRIBUTE_ROOM_CAMERA,
+  TRIBUTE_NAME,
+  TRIBUTE_DATES,
+  TRIBUTE_MESSAGE,
+  TRIBUTE_PHOTO,
+} from "./TributeRoom";
 import ProjectModal, { Project } from "../gallery/ProjectModal";
 import GalleryOverlayPanel from "./GalleryOverlayPanel";
 import GalleryMap from "./GalleryMap";
@@ -96,7 +103,11 @@ export default function GalleryScene() {
   const [portalStage, setPortalStage] = useState<"none" | "entering" | "inside" | "exiting">("none");
   // Which hidden portal is currently active — drives which room the camera
   // transitions into and which room component GalleryRoom mounts.
-  const [activePortal, setActivePortal] = useState<"music" | "study" | null>(null);
+  const [activePortal, setActivePortal] = useState<"music" | "study" | "tribute" | null>(null);
+  // Tribute room audio — starts muted; user can fade it in via the unmute
+  // pill rendered bottom-right while inside the room.
+  const tributeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [tributeMuted, setTributeMuted] = useState(true);
   const [portalReady, setPortalReady] = useState(false);
   // Active direct A→B camera override — used for vault-to-vault jumps so the
   // camera flies straight between two vault stops instead of sweeping through
@@ -299,8 +310,14 @@ export default function GalleryScene() {
     audioRef.current = new Audio("/audio/gallery-vibes.mp3");
     audioRef.current.loop = true;
     audioRef.current.volume = 0.3;
+    // Tribute audio — placeholder filename, swap by dropping a different
+    // mp3 at /public/audio/tribute-room.mp3.
+    tributeAudioRef.current = new Audio("/audio/tribute-room.mp3");
+    tributeAudioRef.current.loop = true;
+    tributeAudioRef.current.volume = 0;
     return () => {
       audioRef.current?.pause();
+      tributeAudioRef.current?.pause();
     };
   }, []);
 
@@ -584,6 +601,40 @@ export default function GalleryScene() {
     }, PORTAL_ANIM_MS);
   }, [portalStage, fadeAudio, musicPlaying]);
 
+  // Tribute portal — flies the camera into the lantern garden. Always starts
+  // muted; the user opts in to ambient audio via the unmute pill.
+  const handleTributePortalClick = useCallback(() => {
+    if (portalStage !== "none") return;
+    portalReturnStop.current = Math.max(0, Math.min(LAST, Math.round(targetRef.current)));
+    setMode("manual");
+    setActivePortal("tribute");
+    setPortalStage("entering");
+    setTributeMuted(true);
+    if (audioRef.current && musicPlaying) fadeAudio(audioRef.current, 0, 900);
+    setTimeout(() => {
+      setPortalStage((s) => (s === "entering" ? "inside" : s));
+    }, PORTAL_ANIM_MS);
+  }, [portalStage, fadeAudio, musicPlaying]);
+
+  // Unmute / mute the tribute audio with a gentle fade so it never starts
+  // abruptly.
+  const toggleTributeAudio = useCallback(() => {
+    setTributeMuted((wasMuted) => {
+      const willPlay = wasMuted; // toggling: was muted -> now playing
+      if (!tributeAudioRef.current) return !wasMuted;
+      if (willPlay) {
+        tributeAudioRef.current.volume = 0;
+        tributeAudioRef.current.play().catch(() => {});
+        fadeAudio(tributeAudioRef.current, 0.18, 2200);
+      } else {
+        fadeAudio(tributeAudioRef.current, 0, 700);
+        const ref = tributeAudioRef.current;
+        setTimeout(() => ref?.pause(), 750);
+      }
+      return !wasMuted;
+    });
+  }, [fadeAudio]);
+
   // Study remote handlers — cycle pieces or (when Bookshelf is selected)
   // cycle individual book titles so the label reveals each title in turn.
   const studyBookshelfIdx = useMemo(
@@ -751,11 +802,18 @@ export default function GalleryScene() {
     snapRef.current = true;
     // Restore gallery music on the way out
     if (audioRef.current && musicPlaying) fadeAudio(audioRef.current, 0.3, 900);
+    // Fade tribute audio out if it was playing.
+    if (tributeAudioRef.current && !tributeMuted) {
+      fadeAudio(tributeAudioRef.current, 0, 700);
+      const ref = tributeAudioRef.current;
+      setTimeout(() => ref?.pause(), 750);
+    }
     setTimeout(() => {
       setPortalStage("none");
       setActivePortal(null);
+      setTributeMuted(true);
     }, PORTAL_ANIM_MS);
-  }, [portalStage, fadeAudio, updateTarget, musicPlaying]);
+  }, [portalStage, fadeAudio, updateTarget, musicPlaying, tributeMuted]);
 
   useEffect(() => {
     const t = setTimeout(() => { if (!entered) handleEnter(); }, 6000);
@@ -871,7 +929,9 @@ export default function GalleryScene() {
       };
     }
     if (portalStage === "entering" || portalStage === "inside") {
-      return activePortal === "study" ? STUDY_ROOM_CAMERA : MUSIC_ROOM_CAMERA;
+      if (activePortal === "study") return STUDY_ROOM_CAMERA;
+      if (activePortal === "tribute") return TRIBUTE_ROOM_CAMERA;
+      return MUSIC_ROOM_CAMERA;
     }
     return null;
   })();
@@ -881,7 +941,7 @@ export default function GalleryScene() {
       <Canvas
         shadows
         dpr={[1, 1.5]}
-        camera={{ fov: 55, near: 0.1, far: 30, position: [0, 1.7, 1.5] }}
+        camera={{ fov: 55, near: 0.1, far: 100, position: [0, 1.7, 1.5] }}
         gl={{ antialias: false, alpha: false, powerPreference: "default", toneMapping: THREE.LinearToneMapping, toneMappingExposure: 1.6 }}
         style={{ background: "#050403" }}
         onPointerMissed={() => {
@@ -919,6 +979,7 @@ export default function GalleryScene() {
             onStudyPortalClick={handleStudyPortalClick}
             activePortal={activePortal}
             onHireMe={() => setActivePanel("commission")}
+            onTributePortalClick={handleTributePortalClick}
           />
         </Suspense>
       </Canvas>
@@ -1092,6 +1153,102 @@ export default function GalleryScene() {
               E
             </span>
             <span>Press to enter</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Tribute room — desktop unmute pill (bottom-right). Lets the user
+          opt into the ambient track without it ever starting abruptly. */}
+      <AnimatePresence>
+        {portalStage === "inside" && activePortal === "tribute" && !isMobile && (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.4 }}
+            onClick={toggleTributeAudio}
+            aria-label={tributeMuted ? "Unmute ambient music" : "Mute ambient music"}
+            className="fixed bottom-6 right-6 z-30 flex items-center gap-2 rounded-full border border-white/15 bg-[#0c0a14]/90 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.2em] text-white/70 backdrop-blur-md transition-colors hover:text-white"
+          >
+            {tributeMuted ? (
+              <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M16.5 12A4.5 4.5 0 0014 8.14v2.12l2.45 2.45c.03-.2.05-.4.05-.71zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.92 8.92 0 0021 12a9 9 0 00-7-8.77v2.06A6.97 6.97 0 0121 12zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 003.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+              </svg>
+            ) : (
+              <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0014 8.14v7.72A4.5 4.5 0 0016.5 12zM14 3.23v2.06A6.97 6.97 0 0121 12a6.97 6.97 0 01-7 6.71v2.06A9 9 0 0023 12 9 9 0 0014 3.23z" />
+              </svg>
+            )}
+            {tributeMuted ? "Play music" : "Mute"}
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Tribute room — mobile 2D overlay. On narrow viewports the 3D
+          lantern garden is replaced with a quiet vertical layout: photo +
+          plaque text + unmute pill. Same emotional weight, less GPU. */}
+      <AnimatePresence>
+        {isMobile && portalStage !== "none" && activePortal === "tribute" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.7 }}
+            className="fixed inset-0 z-40 overflow-y-auto"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, #2a1f4a 0%, #1a1228 50%, #0a0612 100%)",
+            }}
+          >
+            <div className="flex min-h-full flex-col items-center px-6 pb-32 pt-12 text-center">
+              <div className="mb-2 text-[9px] font-medium uppercase tracking-[0.4em] text-amber-300/70">
+                In Memory
+              </div>
+              <h2 className="mb-8 text-[15px] font-light tracking-[0.3em] text-white/85">
+                A QUIET PLACE
+              </h2>
+
+              {/* Photo */}
+              <div className="mb-8 w-[180px] overflow-hidden rounded-md border border-amber-300/20 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+                <img
+                  src={TRIBUTE_PHOTO}
+                  alt={TRIBUTE_NAME}
+                  className="block h-auto w-full"
+                />
+              </div>
+
+              {/* Plaque text */}
+              <div className="mb-1 text-[16px] font-light tracking-[0.25em] text-amber-100/90">
+                {TRIBUTE_NAME}
+              </div>
+              <div className="mb-6 text-[11px] font-light tracking-[0.3em] text-amber-100/60">
+                {TRIBUTE_DATES}
+              </div>
+              <div className="mb-12 text-[13px] italic tracking-[0.18em] text-amber-100/85">
+                {TRIBUTE_MESSAGE}
+              </div>
+
+              {/* Unmute pill */}
+              <button
+                onClick={toggleTributeAudio}
+                className="rounded-full border border-white/20 bg-black/40 px-5 py-2 text-[10px] font-medium uppercase tracking-[0.25em] text-white/70 transition-colors active:scale-95"
+              >
+                {tributeMuted ? "Play ambient music" : "Mute"}
+              </button>
+            </div>
+
+            {/* Fixed bottom — Exit pill */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0a0612]/90 px-4 py-3 backdrop-blur-xl">
+              <button
+                onClick={handlePortalExit}
+                className="mx-auto flex items-center justify-center gap-2 rounded-full border border-amber-300/30 bg-transparent px-6 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-amber-100/85 transition-all active:scale-95"
+              >
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Return to Gallery
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
