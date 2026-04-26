@@ -21,7 +21,8 @@ const FoundersStudy = dynamic(() => import("./FoundersStudy"), { ssr: false });
 // the time the portal activates and there's no Suspense boundary to fall
 // back to null.
 import TributeRoom from "./TributeRoom";
-import TributeLantern from "./TributeLantern";
+import TributeFrame from "./TributeFrame";
+import TributeMedallion from "./TributeMedallion";
 import TechVault from "./TechVault";
 
 /* ------------------------------------------------------------------ */
@@ -50,6 +51,13 @@ const GZ = -1.5;
 export const STOPS: GalleryStop[] = [
   { pos: [0, 1.7, 1.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
   { pos: [1.5, 1.7, -1.0],   lookAt: [5, 1.7, GZ],           label: "Main Gallery",          tier: 1 },
+  // Memorial — paired tribute pieces placed at the very start of the
+  // gallery walk so they set the emotional tone before the rest of
+  // the work. Wall frame on the north wall at x=2.5; spinning medallion
+  // in the corridor just west of it at x=2.0. Both trigger the auto
+  // tour to pause for a respectful beat.
+  { pos: [2.5, 1.5, GZ],      lookAt: [2.5, 1.4, GZ + GW],    label: "In Memory",             tier: 1 },
+  { pos: [2.0, 1.7, GZ - 0.6], lookAt: [2.0, 1.18, GZ],       label: "Memorial Pendant",      tier: 1 },
   // Tech Vault — side alcove branching off the bottom wall at the x=3..5 doorway.
   // Camera sits in the gallery just north of the widened doorway, elevated (y=2.5)
   // so the sight-line clears the lintel (y=2.6) and frames all 7 vitrines through the opening.
@@ -385,6 +393,9 @@ interface GalleryRoomProps {
   studyHighlightedBookIdx?: number;
   /** Fires when the floating tribute lantern hidden in the gallery is tapped. */
   onTributePortalClick?: () => void;
+  /** Fires when the wooden bench inside the tribute room is clicked. Parent
+   *  toggles between standing-entry and seated camera views. */
+  onTributeBenchClick?: () => void;
 }
 
 export default function GalleryRoom({
@@ -419,6 +430,7 @@ export default function GalleryRoom({
   studyPieceIdx = 0,
   studyHighlightedBookIdx = -1,
   onTributePortalClick,
+  onTributeBenchClick,
 }: GalleryRoomProps) {
   const { camera } = useThree();
 
@@ -428,6 +440,10 @@ export default function GalleryRoom({
   const tempPos = useRef(new THREE.Vector3());
   const [focusedLabel, setFocusedLabel] = useState("");
   const smoothLook = useRef(0);
+  // Visibility state for the floating "Press E" hint that lives in 3D
+  // beside the portal painting. Mirrors the proximity ref below — kept
+  // as React state because <Html> only mounts on a true → false flip.
+  const [portalHintVisible, setPortalHintVisible] = useState(false);
 
   // Distance-aware map-snap state — rate is computed once per snap so the
   // duration scales with how far the click jumps.
@@ -730,6 +746,7 @@ export default function GalleryRoom({
     if (ready !== portalReadyState.current) {
       portalReadyState.current = ready;
       onPortalProximityChange?.(ready);
+      setPortalHintVisible(ready);
     }
   });
 
@@ -908,15 +925,56 @@ export default function GalleryRoom({
               tags: ["In Memory", "Forever Loved"],
             })
           }
+          onBenchClick={onTributeBenchClick}
         />
       )}
 
-      {/* Tribute room access — a small floating paper lantern hovering
-          quietly above the goat statue. Subtle by design; clicking it
-          flies the camera into the Tribute Room. Always present on the
-          main gallery floor. */}
+      {/* Tribute room access — wall-mounted ornate memorial frame on
+          the NORTH wall (z = GZ + GW) at x=2.5, the first empty wall
+          section after the entry chamber. Frame center at museum
+          eye-level (y=1.4); rotationY=π so the frame's front normal
+          points -Z (south) into the corridor where viewers walk.
+          Portal trigger for the lantern garden / tribute room. */}
       {!cameraDisabled && (
-        <TributeLantern position={[10, 2.95, -1.5]} onClick={onTributePortalClick} />
+        <TributeFrame
+          position={[2.5, 1.4, GZ + GW - 0.04]}
+          rotationY={Math.PI}
+          onClick={onTributePortalClick}
+        />
+      )}
+
+      {/* Memorial pendant — glass-domed vitrine on the corridor floor at
+          (2.0, 0, GZ), companion centerpiece just west of the wall
+          frame. Spins slowly; click pauses to examine each side. Front
+          face: IMG_4191.jpg, back face: IMG_4192.jpg ("Long Live MAL").
+          rotationY=π so the pedestal placard faces south (-Z) toward
+          the auto-tour camera which approaches from south of the
+          medallion (z = GZ - 0.6). */}
+      {!cameraDisabled && (
+        <TributeMedallion position={[2.0, 0, GZ]} rotationY={Math.PI} />
+      )}
+
+      {/* "Press E" hint — anchored in 3D space just above and slightly
+          in front of the chess-king portal painting on the east wall.
+          Renders only when the camera is close enough (portalHintVisible
+          flips edge-only via the proximity ref above). The painting sits
+          at PORTAL_PAINTING_POS (19, 1.85, 0) facing -X, so the hint
+          floats at slightly lower x (toward the viewer) and higher y. */}
+      {portalHintVisible && (
+        <Html
+          position={[18.6, 2.65, 0]}
+          center
+          distanceFactor={6}
+          zIndexRange={[40, 50]}
+          style={{ pointerEvents: "none" }}
+        >
+          <div className="flex items-center gap-2 whitespace-nowrap rounded-full border border-gallery-accent/40 bg-black/70 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.25em] text-gallery-accent backdrop-blur-sm">
+            <span className="rounded border border-gallery-accent/60 px-1.5 py-0.5 font-mono text-[10px] leading-none text-gallery-accent">
+              E
+            </span>
+            <span>Press to enter</span>
+          </div>
+        </Html>
       )}
 
       {/* Tech Vault — dedicated alcove branching off the top wall at x=3..4 */}

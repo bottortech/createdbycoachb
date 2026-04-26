@@ -18,6 +18,8 @@ const STOP_META: Record<string, { thumb: string; type: string }> = {
   "By Any Means":           { thumb: "/images/By-any-means-logo.jpg", type: "Brand Logo Design" },
   "WiggleWoo Character":    { thumb: "/images/Wiggle-Woo-Character.png", type: "Character Design" },
   "Professor WiggleWoo":    { thumb: "/images/book-cover.jpg",    type: "Children's Book" },
+  "In Memory":              { thumb: "/images/anime-brother.png", type: "Memorial · Tribute Room" },
+  "Memorial Pendant":       { thumb: "/images/IMG_4191.jpg",      type: "Memorial · Spinning Medallion" },
   "Services":               { thumb: "/images/coachb-services.png", type: "Services & Contact" },
   "Tech Vault":             { thumb: "/images/techvault-logo.png", type: "Skills & Tech Stack" },
 };

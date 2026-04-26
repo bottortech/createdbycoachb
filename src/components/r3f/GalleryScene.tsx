@@ -9,6 +9,7 @@ import { SPOTIFY_SRC, TV_LEFT_YT, TV_RIGHT_YT, APPLE_URL } from "./MusicRoom";
 import { STUDY_ROOM_CAMERA, STUDY_PIECES, STUDY_DEFAULT_PIECE_IDX, STUDY_BOOK_TITLES } from "./FoundersStudy";
 import {
   TRIBUTE_ROOM_CAMERA,
+  TRIBUTE_SEATED_CAMERA,
   TRIBUTE_NAME,
   TRIBUTE_DATES,
   TRIBUTE_MESSAGE,
@@ -84,6 +85,13 @@ const MUSIC_ROOM_PIECES: ReadonlyArray<{
 function guidedDwellMs(stop: (typeof STOPS)[number]): number {
   if (stop.label === "WiggleWoo's Word Quest") return 2600;
   if (stop.label === "The Standard") return 2500;
+  // "In Memory" — extra pause so the auto-tour gives the memorial
+  // frame a respectful beat before continuing.
+  if (stop.label === "In Memory") return 3200;
+  // "Memorial Pendant" — slightly longer hold so visitors can see the
+  // spinning medallion turn through both faces (10s/rotation; 5s shows
+  // about half a rotation = front to back).
+  if (stop.label === "Memorial Pendant") return 5500;
   if (stop.label === "Services") return 2000;
   if (stop.label === "Tech Vault") return 150;
   return stop.tier === 1 ? 1750 : stop.tier === 2 ? 2000 : 1500;
@@ -108,6 +116,10 @@ export default function GalleryScene() {
   // pill rendered bottom-right while inside the room.
   const tributeAudioRef = useRef<HTMLAudioElement | null>(null);
   const [tributeMuted, setTributeMuted] = useState(true);
+  // Tribute bench seated state — toggled by clicking the wooden bench.
+  // When seated, the camera lerps to a closer, lower view at eye-level
+  // with the photo. Resets whenever the user exits the room.
+  const [tributeSeated, setTributeSeated] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   // Active direct A→B camera override — used for vault-to-vault jumps so the
   // camera flies straight between two vault stops instead of sweeping through
@@ -610,11 +622,19 @@ export default function GalleryScene() {
     setActivePortal("tribute");
     setPortalStage("entering");
     setTributeMuted(true);
+    setTributeSeated(false);
     if (audioRef.current && musicPlaying) fadeAudio(audioRef.current, 0, 900);
     setTimeout(() => {
       setPortalStage((s) => (s === "entering" ? "inside" : s));
     }, PORTAL_ANIM_MS);
   }, [portalStage, fadeAudio, musicPlaying]);
+
+  // Bench click — toggles between standing-entry and seated views. The
+  // override pos/lookAt swap immediately and the existing portal lerp
+  // smoothly drives the camera between them. No new flight logic.
+  const handleTributeBenchClick = useCallback(() => {
+    setTributeSeated((s) => !s);
+  }, []);
 
   // Unmute / mute the tribute audio with a gentle fade so it never starts
   // abruptly.
@@ -812,6 +832,7 @@ export default function GalleryScene() {
       setPortalStage("none");
       setActivePortal(null);
       setTributeMuted(true);
+      setTributeSeated(false);
     }, PORTAL_ANIM_MS);
   }, [portalStage, fadeAudio, updateTarget, musicPlaying, tributeMuted]);
 
@@ -930,7 +951,8 @@ export default function GalleryScene() {
     }
     if (portalStage === "entering" || portalStage === "inside") {
       if (activePortal === "study") return STUDY_ROOM_CAMERA;
-      if (activePortal === "tribute") return TRIBUTE_ROOM_CAMERA;
+      if (activePortal === "tribute")
+        return tributeSeated ? TRIBUTE_SEATED_CAMERA : TRIBUTE_ROOM_CAMERA;
       return MUSIC_ROOM_CAMERA;
     }
     return null;
@@ -980,6 +1002,7 @@ export default function GalleryScene() {
             activePortal={activePortal}
             onHireMe={() => setActivePanel("commission")}
             onTributePortalClick={handleTributePortalClick}
+            onTributeBenchClick={handleTributeBenchClick}
           />
         </Suspense>
       </Canvas>
@@ -1138,24 +1161,8 @@ export default function GalleryScene() {
         )}
       </AnimatePresence>
 
-      {/* "Press E" hint — fades in when the camera is close enough to the
-          chess-king portal painting. Desktop-only (mobile uses triple-tap). */}
-      <AnimatePresence>
-        {portalReady && entered && !portalActive && !anyOverlayOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.3 }}
-            className="pointer-events-none fixed bottom-20 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-gallery-accent/30 bg-black/60 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.25em] text-gallery-accent backdrop-blur-sm md:flex"
-          >
-            <span className="rounded border border-gallery-accent/50 px-1.5 py-0.5 font-mono text-[10px] leading-none text-gallery-accent">
-              E
-            </span>
-            <span>Press to enter</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* "Press E" hint — moved into 3D space inside GalleryRoom, anchored
+          just above the chess-king portal painting via drei <Html>. */}
 
       {/* Tribute room — desktop unmute pill (bottom-right). Lets the user
           opt into the ambient track without it ever starting abruptly. */}

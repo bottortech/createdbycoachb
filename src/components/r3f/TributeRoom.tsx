@@ -77,20 +77,23 @@ function createSkyTexture(): THREE.CanvasTexture {
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
 
-  // Vertical gradient — deep indigo zenith, warmer violet near the horizon.
+  // Twilight gradient (Your Name vibe) — deep indigo zenith fading
+  // through magenta and warm pink to a peach horizon.
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, "#161028");
-  grad.addColorStop(0.4, "#23193e");
-  grad.addColorStop(0.75, "#3c2754");
-  grad.addColorStop(1, "#5a3a55");
+  grad.addColorStop(0, "#0e0a26");
+  grad.addColorStop(0.25, "#1a0e3a");
+  grad.addColorStop(0.5, "#3a1a55");
+  grad.addColorStop(0.72, "#7a3560");
+  grad.addColorStop(0.88, "#c46a6a");
+  grad.addColorStop(1, "#f0a878");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
-  // Stars — concentrated in the upper half so the horizon stays clean.
-  const starCount = 280;
+  // Stars — concentrated in the upper half (deep twilight portion).
+  const starCount = 220;
   for (let i = 0; i < starCount; i++) {
     const x = Math.random() * w;
-    const y = Math.random() * h * 0.72;
+    const y = Math.random() * h * 0.55;
     const size = 0.3 + Math.random() * 1.4;
     const brightness = 0.25 + Math.random() * 0.7;
     ctx.fillStyle = `rgba(255, 248, 230, ${brightness})`;
@@ -99,46 +102,91 @@ function createSkyTexture(): THREE.CanvasTexture {
     ctx.fill();
   }
 
-  // A few soft glowing patches — distant clouds / nebula hints.
-  for (let i = 0; i < 4; i++) {
-    const x = Math.random() * w;
-    const y = Math.random() * h * 0.55;
-    const radius = 50 + Math.random() * 60;
-    const haze = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    haze.addColorStop(0, "rgba(255, 210, 170, 0.13)");
-    haze.addColorStop(1, "rgba(255, 210, 170, 0)");
-    ctx.fillStyle = haze;
+  // Soft glowing cloud bands — Shinkai-style strato clouds tinted warm
+  // near the horizon and cool higher up.
+  for (let i = 0; i < 6; i++) {
+    const cy = h * (0.45 + Math.random() * 0.35);
+    const cx = Math.random() * w;
+    const cw = 250 + Math.random() * 380;
+    const ch = 22 + Math.random() * 36;
+    const tint = cy > h * 0.7 ? "255, 200, 170" : "190, 150, 200";
+    const grad2 = ctx.createLinearGradient(cx - cw / 2, cy, cx + cw / 2, cy);
+    grad2.addColorStop(0, `rgba(${tint}, 0)`);
+    grad2.addColorStop(0.5, `rgba(${tint}, 0.32)`);
+    grad2.addColorStop(1, `rgba(${tint}, 0)`);
+    ctx.fillStyle = grad2;
     ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, cw / 2, ch, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Soft anime moon — a gentle disc with diffuse halo. Anchors the sky.
+  // Comet trail — a single bright streak arcing across the upper sky
+  // (the Your Name signature). Rendered as a soft tapered line with a
+  // glowing head.
   {
-    const moonX = w * 0.7;
+    const startX = w * 0.12;
+    const startY = h * 0.2;
+    const endX = w * 0.55;
+    const endY = h * 0.05;
+    // Tail — multiple stacked curves with decreasing opacity to give a
+    // soft glow falloff.
+    for (let pass = 0; pass < 4; pass++) {
+      ctx.strokeStyle = `rgba(255, 220, 180, ${0.14 - pass * 0.025})`;
+      ctx.lineWidth = 18 - pass * 3.5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.quadraticCurveTo(w * 0.32, h * 0.02, endX, endY);
+      ctx.stroke();
+    }
+    // Bright core line
+    ctx.strokeStyle = "rgba(255, 250, 230, 0.95)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(w * 0.32, h * 0.02, endX, endY);
+    ctx.stroke();
+    // Glowing head
+    const headX = endX;
+    const headY = endY;
+    const headHalo = ctx.createRadialGradient(headX, headY, 0, headX, headY, 38);
+    headHalo.addColorStop(0, "rgba(255, 250, 230, 1)");
+    headHalo.addColorStop(0.4, "rgba(255, 220, 180, 0.6)");
+    headHalo.addColorStop(1, "rgba(255, 220, 180, 0)");
+    ctx.fillStyle = headHalo;
+    ctx.beginPath();
+    ctx.arc(headX, headY, 38, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Larger anime moon — bigger, brighter, with a wider warm halo. Sits
+  // higher up in the deep-violet portion of the sky.
+  {
+    const moonX = w * 0.74;
     const moonY = h * 0.18;
-    const moonR = 38;
-    // Wide outer halo
-    const halo = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, moonR * 4);
-    halo.addColorStop(0, "rgba(255, 245, 215, 0.22)");
-    halo.addColorStop(1, "rgba(255, 245, 215, 0)");
+    const moonR = 60;
+    // Wide outer halo — much bigger than before
+    const halo = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, moonR * 5.5);
+    halo.addColorStop(0, "rgba(255, 240, 200, 0.30)");
+    halo.addColorStop(0.5, "rgba(255, 220, 180, 0.10)");
+    halo.addColorStop(1, "rgba(255, 220, 180, 0)");
     ctx.fillStyle = halo;
-    ctx.fillRect(moonX - moonR * 4, moonY - moonR * 4, moonR * 8, moonR * 8);
-    // Disc — slight off-center highlight for soft sphere feel
-    const disc = ctx.createRadialGradient(moonX - 10, moonY - 10, 0, moonX, moonY, moonR);
+    ctx.fillRect(moonX - moonR * 5.5, moonY - moonR * 5.5, moonR * 11, moonR * 11);
+    // Disc — soft creamy gradient
+    const disc = ctx.createRadialGradient(moonX - 14, moonY - 14, 0, moonX, moonY, moonR);
     disc.addColorStop(0, "rgba(255, 252, 240, 1)");
-    disc.addColorStop(0.7, "rgba(248, 240, 220, 0.95)");
-    disc.addColorStop(1, "rgba(220, 210, 190, 0.65)");
+    disc.addColorStop(0.7, "rgba(248, 240, 220, 0.96)");
+    disc.addColorStop(1, "rgba(220, 210, 190, 0.7)");
     ctx.fillStyle = disc;
     ctx.beginPath();
     ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
     ctx.fill();
-    // A few faint moon "marias" — suggest texture without detail
+    // Faint moon marias
     ctx.fillStyle = "rgba(180, 170, 150, 0.18)";
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const dx = (Math.random() - 0.5) * moonR * 1.2;
       const dy = (Math.random() - 0.5) * moonR * 1.2;
-      const r = 4 + Math.random() * 6;
+      const r = 5 + Math.random() * 9;
       if (dx * dx + dy * dy < (moonR * 0.85) ** 2) {
         ctx.beginPath();
         ctx.arc(moonX + dx, moonY + dy, r, 0, Math.PI * 2);
@@ -363,17 +411,114 @@ function Floor() {
   );
 }
 
-// ---------- Stone path leading to the centerpiece ----------
-function StonePath() {
-  const tex = useMemo(() => createStoneTexture(), []);
-  useMemo(() => {
-    tex.repeat.set(8, 1);
-  }, [tex]);
+// ---------- Brick stepping-stones path ----------
+// Replaces the previous solid stone path. Warm terracotta brick tiles
+// scattered with deliberate gaps, mossy-green grass plane underneath,
+// plus a subtle branch leading off the main path toward the bench /
+// koi pond on the north side.
+const BRICK_COLORS = ["#a04a32", "#8e3a26", "#b15a3c", "#933e2a", "#a85040"] as const;
+function BrickStone({
+  position,
+  rotationY = 0,
+  width = 0.42,
+  depth = 0.42,
+  colorIdx = 0,
+}: {
+  position: [number, number, number];
+  rotationY?: number;
+  width?: number;
+  depth?: number;
+  colorIdx?: number;
+}) {
+  const color = BRICK_COLORS[colorIdx % BRICK_COLORS.length];
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[77.5, 0.01, 0]}>
-      <planeGeometry args={[10.5, 1.4]} />
-      <meshStandardMaterial map={tex} color="#5a4a55" roughness={0.75} />
-    </mesh>
+    <group position={position} rotation={[0, rotationY, 0]}>
+      {/* Brick top */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.022, 0]} receiveShadow>
+        <planeGeometry args={[width, depth]} />
+        <meshStandardMaterial color={color} roughness={0.9} />
+      </mesh>
+      {/* Subtle dark mortar edges — a slightly larger plane behind */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]}>
+        <planeGeometry args={[width + 0.04, depth + 0.04]} />
+        <meshStandardMaterial color="#1f1812" roughness={0.95} />
+      </mesh>
+    </group>
+  );
+}
+
+function BrickPath() {
+  // Mossy ground patch under the path — slightly raised so the bricks
+  // sit on a subtle green bed instead of the dark floor.
+  const mossPositions: Array<[number, number]> = [
+    [73, 0],
+    [76, 0],
+    [79, 0],
+    [82, 0],
+    [78, 2.0], // branch toward pond
+    [76.5, -1.4], // branch toward bench
+  ];
+  // Scattered brick stones along the main east-west path (z ≈ 0). Each
+  // stone has tiny random offsets baked in below to feel hand-laid.
+  const mainStones: Array<[number, number, number, number]> = [
+    [71.6, 0.02, -0.15, 0],
+    [72.2, 0.18, 0.05, 0],
+    [72.9, -0.12, -0.04, 1],
+    [73.5, 0.08, 0.18, 2],
+    [74.2, -0.05, -0.1, 3],
+    [74.9, 0.15, 0.06, 4],
+    [75.5, -0.18, -0.04, 1],
+    [76.2, 0.05, 0.12, 0],
+    [76.9, -0.08, -0.16, 2],
+    [77.6, 0.16, 0.02, 3],
+    [78.2, -0.05, -0.08, 4],
+    [78.9, 0.1, 0.14, 1],
+    [79.6, -0.15, -0.05, 0],
+    [80.3, 0.08, 0.1, 2],
+    [81.0, -0.05, -0.12, 3],
+    [81.6, 0.18, 0.04, 4],
+  ];
+  // Branch — north side path leading toward the koi pond and bench.
+  const branchStones: Array<[number, number, number, number]> = [
+    [76.2, 0.1, -0.6, 1],
+    [76.0, -0.05, -1.05, 2],
+    [76.4, 0.12, -1.5, 3], // arrives near bench
+    [78.0, 0.05, 1.0, 0],
+    [78.2, -0.08, 1.5, 4],
+    [78.4, 0.1, 2.0, 2], // arrives near pond
+  ];
+  return (
+    <group>
+      {/* Mossy ground patches under the path */}
+      {mossPositions.map(([x, z], i) => (
+        <mesh
+          key={`moss-${i}`}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[x, 0.012, z]}
+        >
+          <planeGeometry args={[3.2, 1.6]} />
+          <meshStandardMaterial color="#2a3a22" roughness={0.95} />
+        </mesh>
+      ))}
+      {/* Main path bricks */}
+      {mainStones.map(([x, dz, drot, c], i) => (
+        <BrickStone
+          key={`m-${i}`}
+          position={[x, 0, dz]}
+          rotationY={drot}
+          colorIdx={c}
+        />
+      ))}
+      {/* Branch bricks */}
+      {branchStones.map(([x, dz, z, c], i) => (
+        <BrickStone
+          key={`b-${i}`}
+          position={[x, 0, z + dz * 0.0]}
+          rotationY={dz}
+          colorIdx={c}
+        />
+      ))}
+    </group>
   );
 }
 
@@ -644,18 +789,6 @@ function PhotoEasel({ onClick }: { onClick?: () => void }) {
           <boxGeometry args={[0.7, 0.03, 0.03]} />
           <meshStandardMaterial color="#3a2818" roughness={0.75} />
         </mesh>
-        {/* Soft warm halo behind the photo — gives the portrait a glow
-            so it pops against the dark scene. */}
-        <mesh position={[0, 0.82, 0.003]}>
-          <planeGeometry args={[PHOTO_W + 0.18, PHOTO_H + 0.22]} />
-          <meshBasicMaterial
-            color="#ffb87a"
-            transparent
-            opacity={0.18}
-            toneMapped={false}
-            depthWrite={false}
-          />
-        </mesh>
         {/* Frame border (outer) */}
         <mesh position={[0, 0.82, 0.005]}>
           <planeGeometry args={[PHOTO_W + 0.12, PHOTO_H + 0.16]} />
@@ -707,15 +840,6 @@ function PhotoEasel({ onClick }: { onClick?: () => void }) {
           />
         </mesh>
       </group>
-      {/* Soft warm spotlight onto the photo so it pops even in the
-          ambient warm/cool lighting. */}
-      <pointLight
-        position={[0.4, 1.6, 0]}
-        color="#fff1c8"
-        intensity={1.4}
-        distance={2.4}
-        decay={2}
-      />
     </group>
   );
 }
@@ -1237,24 +1361,401 @@ function SpiritFoxShrine() {
   );
 }
 
-// ---------- Watcher — distant figure silhouette on a hill ----------
+// ---------- Watcher — anime portrait of Jamal on a distant hill ----------
+// He IS the watcher now: his anime-style portrait stands on a small
+// mound in the back of the garden, silently presiding over his memorial
+// space. Larger than the original silhouette and rendered in full
+// color (no dark tint) so the portrait reads clearly.
 function Watcher() {
   return (
     <group>
-      {/* Small dark mound under the figure so it doesn't appear to float.
-          Watcher pulled in from z=4.6 → z=3.2 so it stays inside the
-          entry FOV at ~15m distance. */}
+      {/* Small dark mound under the figure so it doesn't appear to float. */}
       <mesh position={[86.4, 0.18, 3.2]} receiveShadow>
-        <sphereGeometry args={[0.55, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[0.7, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color="#161220" roughness={0.95} />
       </mesh>
       <AnimeSprite
-        src="/images/tribute/watcher.png"
-        position={[86.4, 0.95, 3.2]}
-        width={0.9}
-        height={1.4}
-        color="#0a0612"
+        src="/images/anime-brother.png"
+        position={[86.4, 1.15, 3.2]}
+        width={1.1}
+        height={1.55}
+        color="#ffffff"
       />
+    </group>
+  );
+}
+
+// ---------- Wooden bench facing the photo+pedestal ----------
+// Sit-and-reflect spot in front of the centerpiece. Wooden seat and
+// backrest with two stone supports. Clicking the seat snaps the camera
+// to a "seated" view — closer and lower, eye-level with the photo.
+const BENCH_POSITION: [number, number, number] = [76.4, 0, -1.6];
+// Seated camera — at the bench, eye-level for a sitting person, looking
+// toward the photo/pedestal. Triggered by clicking the bench.
+export const TRIBUTE_SEATED_CAMERA = {
+  pos: [76.6, 1.05, -1.55] as [number, number, number],
+  lookAt: [82, 0.7, 0] as [number, number, number],
+};
+function WoodenBench({ onClick }: { onClick?: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <group
+      position={BENCH_POSITION}
+      rotation={[0, Math.PI / 2 - Math.PI / 14, 0]}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setHovered(true);
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        setHovered(false);
+        document.body.style.cursor = "default";
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+    >
+      {/* Two stone supports at each end */}
+      {[-0.7, 0.7].map((x, i) => (
+        <mesh key={i} position={[x, 0.18, 0]} castShadow receiveShadow>
+          <boxGeometry args={[0.22, 0.36, 0.32]} />
+          <meshStandardMaterial color="#5a554c" roughness={0.85} />
+        </mesh>
+      ))}
+      {/* Wooden seat plank — slightly highlighted on hover. */}
+      <mesh position={[0, 0.4, 0]} castShadow>
+        <boxGeometry args={[1.7, 0.08, 0.36]} />
+        <meshStandardMaterial
+          color={hovered ? "#5a3a22" : "#3d2614"}
+          roughness={0.7}
+          emissive={hovered ? "#3a1f08" : "#000000"}
+          emissiveIntensity={hovered ? 0.4 : 0}
+        />
+      </mesh>
+      {/* Backrest top horizontal beam */}
+      <mesh position={[0, 0.86, -0.14]} castShadow>
+        <boxGeometry args={[1.7, 0.08, 0.06]} />
+        <meshStandardMaterial color="#3d2614" roughness={0.7} />
+      </mesh>
+      {/* Backrest middle horizontal beam */}
+      <mesh position={[0, 0.66, -0.14]} castShadow>
+        <boxGeometry args={[1.7, 0.05, 0.05]} />
+        <meshStandardMaterial color="#3d2614" roughness={0.7} />
+      </mesh>
+      {/* Backrest vertical posts at each end */}
+      <mesh position={[-0.78, 0.66, -0.14]} castShadow>
+        <boxGeometry args={[0.06, 0.6, 0.06]} />
+        <meshStandardMaterial color="#3d2614" roughness={0.7} />
+      </mesh>
+      <mesh position={[0.78, 0.66, -0.14]} castShadow>
+        <boxGeometry args={[0.06, 0.6, 0.06]} />
+        <meshStandardMaterial color="#3d2614" roughness={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+// ---------- Memorial plaque beside the bench ----------
+// Small upright stone slab with a short engraved message — placed
+// just to the left of the bench so a seated visitor can read it.
+function MemorialPlaque() {
+  // Positioned just to the right of the seated visitor (south side of
+  // the bench) and rotated so its face is readable from the bench.
+  return (
+    <group position={[76.0, 0, -2.5]} rotation={[0, Math.PI / 5, 0]}>
+      {/* Small base */}
+      <mesh position={[0, 0.06, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.5, 0.12, 0.32]} />
+        <meshStandardMaterial color="#4a443c" roughness={0.85} />
+      </mesh>
+      {/* Upright slab */}
+      <mesh position={[0, 0.42, 0]} rotation={[Math.PI / 26, 0, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.42, 0.6, 0.06]} />
+        <meshStandardMaterial color="#5a544c" roughness={0.8} />
+      </mesh>
+      {/* Engraved text */}
+      <Text
+        position={[0, 0.55, 0.04]}
+        rotation={[Math.PI / 26, 0, 0]}
+        fontSize={0.038}
+        color="#1c1810"
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={0.36}
+        textAlign="center"
+        letterSpacing={0.05}
+      >
+        Sit a while.{"\n"}He's still here{"\n"}in the quiet.
+      </Text>
+    </group>
+  );
+}
+
+// ---------- Tsukubai — stone water basin with bamboo spout ----------
+// Traditional Japanese garden basin (low circular stone bowl) with a
+// small bamboo pipe trickling water into it. Placed near the entrance
+// of the room so visitors pass by it.
+function Tsukubai() {
+  const dropRef = useRef<THREE.Mesh>(null);
+  // Animate a tiny water drop falling from the bamboo spout into the
+  // basin on a slow loop. Cheap and atmospheric.
+  useFrame(({ clock }) => {
+    if (!dropRef.current) return;
+    const t = (clock.elapsedTime * 0.6) % 1;
+    dropRef.current.position.y = 0.5 - t * 0.32;
+    dropRef.current.visible = t < 0.85;
+  });
+  return (
+    <group position={[73.5, 0, 2.2]}>
+      {/* Stone basin — squat cylinder */}
+      <mesh position={[0, 0.16, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.32, 0.36, 0.32, 24]} />
+        <meshStandardMaterial color="#4f4940" roughness={0.85} />
+      </mesh>
+      {/* Carved-out water surface at top */}
+      <mesh position={[0, 0.31, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.27, 24]} />
+        <meshStandardMaterial
+          color="#1a2438"
+          roughness={0.25}
+          metalness={0.3}
+          emissive="#1c2842"
+          emissiveIntensity={0.2}
+        />
+      </mesh>
+      {/* Bamboo pipe — vertical post */}
+      <mesh position={[-0.45, 0.5, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 1.0, 12]} />
+        <meshStandardMaterial color="#7a6438" roughness={0.7} />
+      </mesh>
+      {/* Bamboo segment rings */}
+      {[0.15, 0.45, 0.75].map((y, i) => (
+        <mesh key={i} position={[-0.45, y, 0]}>
+          <torusGeometry args={[0.045, 0.005, 8, 16]} />
+          <meshStandardMaterial color="#3a2f18" roughness={0.7} />
+        </mesh>
+      ))}
+      {/* Horizontal bamboo spout extending over the basin */}
+      <mesh position={[-0.22, 0.85, 0]} rotation={[0, 0, Math.PI / 2.4]}>
+        <cylinderGeometry args={[0.035, 0.035, 0.45, 12]} />
+        <meshStandardMaterial color="#7a6438" roughness={0.7} />
+      </mesh>
+      {/* Falling water drop */}
+      <mesh ref={dropRef} position={[-0.05, 0.5, 0]}>
+        <sphereGeometry args={[0.022, 8, 6]} />
+        <meshBasicMaterial color="#a8c8ff" toneMapped={false} transparent opacity={0.85} />
+      </mesh>
+      {/* Small smooth pebbles around the basin base */}
+      {[
+        [0.4, 0.0, 0.1],
+        [-0.1, 0.0, 0.42],
+        [0.3, 0.0, -0.36],
+        [-0.45, 0.0, -0.2],
+      ].map(([dx, dy, dz], i) => (
+        <mesh key={i} position={[dx, 0.04 + dy, dz]} castShadow>
+          <sphereGeometry args={[0.05 + (i % 3) * 0.012, 8, 6]} />
+          <meshStandardMaterial color="#5a544c" roughness={0.9} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// ---------- Wooden arch bridge over the koi pond ----------
+function KoiPondBridge() {
+  const planks = 9;
+  const bridgeLength = 2.8;
+  return (
+    <group position={[KOI_POND_CENTER[0], 0, KOI_POND_CENTER[2]]} rotation={[0, Math.PI / 2, 0]}>
+      {/* Arched planks — each rotated slightly to form a gentle arc. */}
+      {Array.from({ length: planks }, (_, i) => {
+        const t = i / (planks - 1); // 0..1
+        const ang = (t - 0.5) * 0.6; // -0.3..0.3 rad arc
+        const x = (t - 0.5) * bridgeLength;
+        const y = 0.45 + Math.cos(ang) * 0.18 - 0.14; // arch up in the middle
+        return (
+          <mesh
+            key={i}
+            position={[x, y, 0]}
+            rotation={[0, 0, ang]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={[bridgeLength / planks + 0.02, 0.04, 0.95]} />
+            <meshStandardMaterial color="#5a3a22" roughness={0.75} />
+          </mesh>
+        );
+      })}
+      {/* Two railings — left and right side, also arching */}
+      {[-0.45, 0.45].map((zSide, idx) => (
+        <group key={idx}>
+          {Array.from({ length: planks }, (_, i) => {
+            const t = i / (planks - 1);
+            const ang = (t - 0.5) * 0.6;
+            const x = (t - 0.5) * bridgeLength;
+            const y = 0.7 + Math.cos(ang) * 0.18 - 0.14;
+            return (
+              <mesh key={i} position={[x, y, zSide]} rotation={[0, 0, ang]}>
+                <boxGeometry args={[bridgeLength / planks + 0.02, 0.04, 0.04]} />
+                <meshStandardMaterial color="#3a2818" roughness={0.7} />
+              </mesh>
+            );
+          })}
+          {/* Vertical posts on each side */}
+          {[-1.1, 0, 1.1].map((px, i) => (
+            <mesh key={`p-${i}`} position={[px, 0.45, zSide]}>
+              <boxGeometry args={[0.05, 0.5, 0.05]} />
+              <meshStandardMaterial color="#3a2818" roughness={0.7} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+// ---------- Bamboo grove silhouette behind the watcher ----------
+// Tall thin cylinders with small leaf clusters. Set far back so they
+// frame the watcher figure without crowding the foreground.
+function BambooGrove() {
+  const stalks = useMemo(() => {
+    const out: Array<{ x: number; z: number; height: number; sway: number }> = [];
+    for (let i = 0; i < 22; i++) {
+      out.push({
+        x: 86 + Math.random() * 1.8,
+        z: 1.5 + Math.random() * 4.5,
+        height: 2.6 + Math.random() * 1.4,
+        sway: Math.random() * Math.PI * 2,
+      });
+    }
+    return out;
+  }, []);
+  return (
+    <group>
+      {stalks.map((s, i) => (
+        <group key={i} position={[s.x, 0, s.z]}>
+          {/* Stalk */}
+          <mesh position={[0, s.height / 2, 0]}>
+            <cylinderGeometry args={[0.04, 0.05, s.height, 6]} />
+            <meshStandardMaterial color="#1a2818" roughness={0.85} />
+          </mesh>
+          {/* Tiny leaf cluster near the top */}
+          <mesh position={[0, s.height + 0.05, 0]}>
+            <sphereGeometry args={[0.18, 6, 5]} />
+            <meshStandardMaterial color="#2a3a1f" roughness={0.95} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+// ---------- Wind chime hanging from a sakura branch ----------
+function WindChime() {
+  const ref = useRef<THREE.Group>(null);
+  // Slow gentle sway like a breeze.
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    ref.current.rotation.z = Math.sin(clock.elapsedTime * 0.6) * 0.06;
+  });
+  return (
+    <group position={[85.2, 2.6, -3.0]}>
+      {/* Cord from above */}
+      <mesh position={[0, 0.55, 0]}>
+        <cylinderGeometry args={[0.003, 0.003, 1.1, 4]} />
+        <meshStandardMaterial color="#1a1410" />
+      </mesh>
+      {/* Swaying cluster */}
+      <group ref={ref} position={[0, 0, 0]}>
+        {/* Small bell — bright ceramic dome */}
+        <mesh position={[0, 0, 0]}>
+          <sphereGeometry args={[0.08, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial
+            color="#e0c878"
+            metalness={0.3}
+            roughness={0.45}
+            emissive="#a08840"
+            emissiveIntensity={0.15}
+          />
+        </mesh>
+        {/* Paper tag dangling beneath */}
+        <mesh position={[0, -0.18, 0]}>
+          <planeGeometry args={[0.06, 0.16]} />
+          <meshStandardMaterial color="#f4e8c0" roughness={0.85} side={THREE.DoubleSide} />
+        </mesh>
+        {/* Three small clappers/strips */}
+        {[-0.04, 0, 0.04].map((dx, i) => (
+          <mesh key={i} position={[dx, -0.06, 0]}>
+            <cylinderGeometry args={[0.0035, 0.0035, 0.1, 4]} />
+            <meshStandardMaterial color="#b09060" />
+          </mesh>
+        ))}
+      </group>
+    </group>
+  );
+}
+
+// ---------- Rising sakura petals (5cm/sec vibe) ----------
+// Petals that drift UPWARD into the sky, opposite of the falling
+// SakuraPetals system. Subtle, low count — adds a sense of letting
+// go / things rising into memory.
+function RisingPetals() {
+  const PETAL_COUNT = 24;
+  const groupRef = useRef<THREE.Group>(null);
+  const petals = useMemo(() => {
+    const arr: Array<{
+      baseX: number;
+      baseZ: number;
+      phase: number;
+      speed: number;
+      maxY: number;
+    }> = [];
+    for (let i = 0; i < PETAL_COUNT; i++) {
+      arr.push({
+        baseX: 73 + Math.random() * 12,
+        baseZ: (Math.random() - 0.5) * 7,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.18 + Math.random() * 0.18,
+        maxY: 9 + Math.random() * 3,
+      });
+    }
+    return arr;
+  }, []);
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    const t = clock.elapsedTime;
+    groupRef.current.children.forEach((child, i) => {
+      const p = petals[i];
+      const cycle = ((t * p.speed + p.phase) % 1) * p.maxY;
+      child.position.x = p.baseX + Math.sin(t * 0.4 + p.phase) * 0.5;
+      child.position.y = 0.5 + cycle;
+      child.position.z = p.baseZ + Math.cos(t * 0.35 + p.phase * 1.4) * 0.4;
+      child.rotation.z = t * 0.4 + p.phase;
+      // Fade in at the bottom, hold mid, fade out near the top.
+      const norm = cycle / p.maxY;
+      const opacity = Math.min(norm * 4, 1) * Math.min((1 - norm) * 2.5, 1);
+      const mesh = child as THREE.Mesh;
+      if (mesh.material instanceof THREE.MeshBasicMaterial) {
+        mesh.material.opacity = Math.max(0, opacity * 0.85);
+      }
+    });
+  });
+  return (
+    <group ref={groupRef}>
+      {petals.map((_, i) => (
+        <mesh key={i}>
+          <planeGeometry args={[0.08, 0.05]} />
+          <meshBasicMaterial
+            color="#ffc8d8"
+            transparent
+            opacity={0}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -1390,8 +1891,11 @@ interface TributeRoomProps {
   /** Fires when the user clicks the photo on the easel. Parent surfaces
    *  this as a "piece" modal (same UX as the main-gallery ProjectModal). */
   onPhotoClick?: () => void;
+  /** Fires when the user clicks the wooden bench. Parent toggles the
+   *  camera between standing-entry view and a closer "seated" view. */
+  onBenchClick?: () => void;
 }
-export default function TributeRoom({ onPhotoClick }: TributeRoomProps = {}) {
+export default function TributeRoom({ onPhotoClick, onBenchClick }: TributeRoomProps = {}) {
   // Mount log so we can confirm the dynamic import resolved + the room
   // actually rendered, separate from any visual glitch.
   useEffect(() => {
@@ -1451,9 +1955,11 @@ export default function TributeRoom({ onPhotoClick }: TributeRoomProps = {}) {
       <SkyDome />
 
       <Floor />
-      <StonePath />
+      <BrickPath />
 
       <MountainBackdrop />
+
+      <BambooGrove />
 
       <SakuraTree x={85.2} z={-3.8} scale={2.4} />
       <SakuraTree x={85.2} z={3.8} scale={2.2} />
@@ -1489,15 +1995,27 @@ export default function TributeRoom({ onPhotoClick }: TributeRoomProps = {}) {
           throughout, a small spirit fox near the entrance, and a distant
           silhouetted watcher figure on a far hill. */}
       <KoiPond />
+      <KoiPondBridge />
       <Fireflies />
       <SpiritFoxShrine />
       <Watcher />
 
+      {/* Reflective garden elements — bench facing the photo, plaque
+          beside it, water basin at the entrance, wind chime hanging
+          from a sakura branch. */}
+      <WoodenBench onClick={onBenchClick} />
+      <MemorialPlaque />
+      <Tsukubai />
+      <WindChime />
+
       <SakuraPetals />
+      <RisingPetals />
       <WispOrbs />
 
-      <ambientLight intensity={0.6} color="#7e6dab" />
-      <hemisphereLight color="#5a4ab0" groundColor="#2a2040" intensity={0.55} />
+      {/* Twilight ambience — warmer pink/violet sky tone with a slightly
+          warmer ground bounce so the brick path reads correctly. */}
+      <ambientLight intensity={0.7} color="#a07896" />
+      <hemisphereLight color="#7a4878" groundColor="#3a2a30" intensity={0.6} />
       <pointLight
         position={[82, 2.55, 0]}
         color="#ffb47a"
