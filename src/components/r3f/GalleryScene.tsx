@@ -85,13 +85,6 @@ const MUSIC_ROOM_PIECES: ReadonlyArray<{
 function guidedDwellMs(stop: (typeof STOPS)[number]): number {
   if (stop.label === "WiggleWoo's Word Quest") return 2600;
   if (stop.label === "The Standard") return 2500;
-  // "In Memory" — extra pause so the auto-tour gives the memorial
-  // frame a respectful beat before continuing.
-  if (stop.label === "In Memory") return 3200;
-  // "Memorial Pendant" — slightly longer hold so visitors can see the
-  // spinning medallion turn through both faces (10s/rotation; 5s shows
-  // about half a rotation = front to back).
-  if (stop.label === "Memorial Pendant") return 5500;
   if (stop.label === "Services") return 2000;
   if (stop.label === "Tech Vault") return 150;
   return stop.tier === 1 ? 1750 : stop.tier === 2 ? 2000 : 1500;

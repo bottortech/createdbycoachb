@@ -15,14 +15,11 @@ import { DiamondPedestal, EnvelopePedestal, PhonePedestal, ConnectPedestal } fro
 // Lazy-loaded — not bundled with initial gallery payload
 const MusicRoom = dynamic(() => import("./MusicRoom"), { ssr: false });
 const FoundersStudy = dynamic(() => import("./FoundersStudy"), { ssr: false });
-// TributeRoom: switched from dynamic() to a regular import. The dynamic +
-// Suspense wrapper was sometimes leaving the room blank on entry while the
-// chunk loaded; with a static import, the component is in the bundle by
-// the time the portal activates and there's no Suspense boundary to fall
-// back to null.
-import TributeRoom from "./TributeRoom";
-import TributeFrame from "./TributeFrame";
-import TributeMedallion from "./TributeMedallion";
+// Tribute pieces are temporarily hidden from the site. The component
+// files remain in the repo for an easy restore — re-import TributeRoom,
+// TributeFrame, and TributeMedallion below, re-add their mounts in the
+// JSX, restore the "In Memory" and "Memorial Pendant" STOPS, and put
+// the matching entries back in GalleryMap's STOP_META.
 import TechVault from "./TechVault";
 
 /* ------------------------------------------------------------------ */
@@ -51,13 +48,6 @@ const GZ = -1.5;
 export const STOPS: GalleryStop[] = [
   { pos: [0, 1.7, 1.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
   { pos: [1.5, 1.7, -1.0],   lookAt: [5, 1.7, GZ],           label: "Main Gallery",          tier: 1 },
-  // Memorial — paired tribute pieces placed at the very start of the
-  // gallery walk so they set the emotional tone before the rest of
-  // the work. Wall frame on the north wall at x=2.5; spinning medallion
-  // in the corridor just west of it at x=2.0. Both trigger the auto
-  // tour to pause for a respectful beat.
-  { pos: [2.5, 1.5, GZ],      lookAt: [2.5, 1.4, GZ + GW],    label: "In Memory",             tier: 1 },
-  { pos: [2.0, 1.7, GZ - 0.6], lookAt: [2.0, 1.18, GZ],       label: "Memorial Pendant",      tier: 1 },
   // Tech Vault — side alcove branching off the bottom wall at the x=3..5 doorway.
   // Camera sits in the gallery just north of the widened doorway, elevated (y=2.5)
   // so the sight-line clears the lintel (y=2.6) and frames all 7 vitrines through the opening.
@@ -913,46 +903,11 @@ export default function GalleryRoom({
       {portalActive && activePortal === "study" && (
         <FoundersStudy onHireMe={onHireMe} highlightedBookIdx={studyHighlightedBookIdx} />
       )}
-      {portalActive && activePortal === "tribute" && (
-        <TributeRoom
-          onPhotoClick={() =>
-            onSelectProject({
-              title: "Jamal Brown",
-              category: "1997 — 2021",
-              image: "/images/brother.jpg",
-              description:
-                "A quiet place in his memory — built into a corner of this gallery. He loved anime, and the soft worlds it carried him to. This room borrows that calm. He's still here in the work.",
-              tags: ["In Memory", "Forever Loved"],
-            })
-          }
-          onBenchClick={onTributeBenchClick}
-        />
-      )}
-
-      {/* Tribute room access — wall-mounted ornate memorial frame on
-          the NORTH wall (z = GZ + GW) at x=2.5, the first empty wall
-          section after the entry chamber. Frame center at museum
-          eye-level (y=1.4); rotationY=π so the frame's front normal
-          points -Z (south) into the corridor where viewers walk.
-          Portal trigger for the lantern garden / tribute room. */}
-      {!cameraDisabled && (
-        <TributeFrame
-          position={[2.5, 1.4, GZ + GW - 0.04]}
-          rotationY={Math.PI}
-          onClick={onTributePortalClick}
-        />
-      )}
-
-      {/* Memorial pendant — glass-domed vitrine on the corridor floor at
-          (2.0, 0, GZ), companion centerpiece just west of the wall
-          frame. Spins slowly; click pauses to examine each side. Front
-          face: IMG_4191.jpg, back face: IMG_4192.jpg ("Long Live MAL").
-          rotationY=π so the pedestal placard faces south (-Z) toward
-          the auto-tour camera which approaches from south of the
-          medallion (z = GZ - 0.6). */}
-      {!cameraDisabled && (
-        <TributeMedallion position={[2.0, 0, GZ]} rotationY={Math.PI} />
-      )}
+      {/* Tribute room + wall memorial frame + spinning medallion are
+          temporarily hidden. The component files (TributeRoom.tsx,
+          TributeFrame.tsx, TributeMedallion.tsx) and tribute portal
+          state in GalleryScene remain intact for an easy restore — see
+          the comment on the import block above for the restore steps. */}
 
       {/* "Press E" hint — anchored in 3D space just above and slightly
           in front of the chess-king portal painting on the east wall.
