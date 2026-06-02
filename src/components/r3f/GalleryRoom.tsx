@@ -2,7 +2,7 @@
 
 import { useRef, useMemo, useState, useEffect } from "react";
 import { useFrame, useThree, useLoader } from "@react-three/fiber";
-import { useTexture, Html } from "@react-three/drei";
+import { useTexture, Html, Text } from "@react-three/drei";
 import * as THREE from "three";
 import dynamic from "next/dynamic";
 import { TDSLoader } from "three/examples/jsm/loaders/TDSLoader.js";
@@ -47,7 +47,7 @@ const GZ = -1.5;
 
 export const STOPS: GalleryStop[] = [
   { pos: [0, 1.7, 1.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
-  { pos: [1.5, 1.7, -1.0],   lookAt: [5, 1.7, GZ],           label: "Main Gallery",          tier: 1 },
+  { pos: [2.4, 2.2, 0.8],     lookAt: [1.2, 1.72, -3.8],      label: "Main Gallery",          tier: 1 },
   // Tech Vault — side alcove branching off the bottom wall at the x=3..5 doorway.
   // Camera sits in the gallery just north of the widened doorway, elevated (y=2.5)
   // so the sight-line clears the lintel (y=2.6) and frames all 7 vitrines through the opening.
@@ -197,6 +197,197 @@ const ARTWORKS: ArtworkDef[] = [
     noLight: true,
     project: { title: "__portal", category: "", image: "/images/right-side.png", description: "", tags: [] }},
 ];
+
+/* ------------------------------------------------------------------ */
+/*  PROJECTOR + TESTIMONIAL SCREEN                                     */
+/* ------------------------------------------------------------------ */
+
+// Projector in the corridor at x=2, rotation [0, PI/2, 0].
+// R_y(PI/2) maps local +x → world -z, so the lens (local +x) faces the bottom wall at z=-4.
+// LENS_WZ = PROJ[2] - 0.22  (local x=+0.22 → world z = PROJ_Z - 0.22)
+const PROJ: [number, number, number] = [1.2, 1.52, -0.8];
+const SCREEN_CENTER: [number, number, number] = [1.2, 1.78, GZ - GW + 0.002]; // bottom wall z≈-3.998
+const SW = 2.3;
+const SH = 1.28;
+const LENS_WZ = PROJ[2] - 0.22;                         // ≈ -1.02
+const BEAM_LEN = Math.abs(SCREEN_CENTER[2] - LENS_WZ);  // ≈ 2.98
+
+function ProjectorDisplay() {
+  const [slide, setSlide] = useState(0);
+  const lensRef    = useRef<THREE.Mesh>(null);
+  const flashingIn = useRef(false);
+
+  useEffect(() => {
+    const tick = () => {
+      flashingIn.current = true;
+      setTimeout(() => {
+        flashingIn.current = false;
+        setSlide((s) => (s + 1) % 3);
+      }, 80);
+    };
+    const id = setInterval(tick, 6000);
+    return () => clearInterval(id);
+  }, []);
+
+  useFrame((_, dt) => {
+    if (lensRef.current) {
+      const mat = lensRef.current.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = flashingIn.current
+        ? Math.min(3.5, mat.emissiveIntensity + dt * 20)
+        : Math.max(1.2, mat.emissiveIntensity - dt * 6);
+    }
+  });
+
+  return (
+    <>
+      {/* ── Projector body on stand ─────────────────────────────── */}
+      <group position={PROJ} rotation={[0, Math.PI / 2, 0]}>
+        <mesh position={[0, -PROJ[1] / 2, 0]}>
+          <cylinderGeometry args={[0.022, 0.028, PROJ[1], 8]} />
+          <meshStandardMaterial color="#1a1a28" metalness={0.7} roughness={0.35} />
+        </mesh>
+        <mesh position={[0, -PROJ[1] + 0.008, 0]}>
+          <boxGeometry args={[0.26, 0.014, 0.26]} />
+          <meshStandardMaterial color="#111118" metalness={0.8} roughness={0.2} />
+        </mesh>
+        <mesh>
+          <boxGeometry args={[0.36, 0.2, 0.24]} />
+          <meshStandardMaterial color="#131320" metalness={0.3} roughness={0.7} />
+        </mesh>
+        <mesh position={[0, 0.1, 0]}>
+          <boxGeometry args={[0.36, 0.007, 0.24]} />
+          <meshStandardMaterial color="#1e1e32" metalness={0.6} roughness={0.4} />
+        </mesh>
+        {[-0.06, 0.0, 0.06].map((oz, i) => (
+          <mesh key={i} position={[0.04, 0.098, oz]}>
+            <boxGeometry args={[0.1, 0.004, 0.009]} />
+            <meshStandardMaterial color="#2a2a45" />
+          </mesh>
+        ))}
+        <mesh position={[-0.13, 0.05, 0.1]}>
+          <sphereGeometry args={[0.011, 8, 8]} />
+          <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={2.5} />
+        </mesh>
+        <mesh position={[0.2, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <torusGeometry args={[0.066, 0.015, 12, 24]} />
+          <meshStandardMaterial color="#2a2a40" metalness={0.85} roughness={0.15} />
+        </mesh>
+        <mesh position={[0.205, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <torusGeometry args={[0.074, 0.007, 8, 24]} />
+          <meshStandardMaterial color="#1a1a2e" metalness={0.9} roughness={0.1} />
+        </mesh>
+        <mesh ref={lensRef} position={[0.222, 0, 0]}>
+          <sphereGeometry args={[0.054, 20, 20]} />
+          <meshStandardMaterial color="#c0a8ff" emissive="#7a45e8" emissiveIntensity={1.2} metalness={0.95} roughness={0.05} transparent opacity={0.9} />
+        </mesh>
+        <mesh position={[0.225, 0.01, -0.01]}>
+          <sphereGeometry args={[0.016, 8, 8]} />
+          <meshStandardMaterial color="white" emissive="white" emissiveIntensity={2} transparent opacity={0.75} />
+        </mesh>
+      </group>
+
+      {/* ── Beam ────────────────────────────────────────────────── */}
+      <group position={[PROJ[0], (PROJ[1] + SCREEN_CENTER[1]) / 2, (LENS_WZ + SCREEN_CENTER[2]) / 2]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[SW / 2 + 0.12, 0.06, BEAM_LEN, 16, 1, true]} />
+          <meshBasicMaterial color="#9070e0" transparent opacity={0.032} side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[SW / 3, 0.025, BEAM_LEN, 12, 1, true]} />
+          <meshBasicMaterial color="#b090ff" transparent opacity={0.055} side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+      </group>
+
+
+      <SpotLightWithTarget position={[PROJ[0], PROJ[1], LENS_WZ]} targetPosition={SCREEN_CENTER} intensity={10} angle={0.46} penumbra={0.45} distance={6} castShadow={false} />
+
+      {/* ── Metallic plaque above the screen ───────────────────── */}
+      <group position={[SCREEN_CENTER[0], SCREEN_CENTER[1] + SH / 2 + 0.11, SCREEN_CENTER[2] + 0.003]}>
+        <mesh>
+          <boxGeometry args={[0.72, 0.072, 0.014]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.92} roughness={0.12} />
+        </mesh>
+        <Text position={[0, 0, 0.008]} fontSize={0.032} color="#fff8e0" letterSpacing={0.38} anchorX="center" anchorY="middle">
+          CLIENT REVIEWS
+        </Text>
+      </group>
+
+      {/* ── Wall screen ─────────────────────────────────────────── */}
+      <group position={SCREEN_CENTER} rotation={[0, 0, 0]}>
+        {/* Gold frame */}
+        <mesh position={[0, 0, -0.018]}>
+          <boxGeometry args={[SW + 0.08, SH + 0.08, 0.018]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.82} roughness={0.18} />
+        </mesh>
+        {/* Screen surface */}
+        <mesh>
+          <planeGeometry args={[SW, SH]} />
+          <meshStandardMaterial color="#05061a" emissive="#0c0d2c" emissiveIntensity={0.55} />
+        </mesh>
+        <pointLight position={[0, 0, 0.4]} intensity={1.4} distance={3} color="#a090dd" />
+
+        {/* ── Slide 0: Title ───────────────────────────────────── */}
+        <group visible={slide === 0}>
+          <Text position={[0, 0.24, 0.005]} fontSize={0.042} color="#b49aff" letterSpacing={0.5} textAlign="center" anchorX="center" anchorY="middle">
+            CLIENT TESTIMONIALS
+          </Text>
+          <mesh position={[0, 0.1, 0.004]}>
+            <planeGeometry args={[SW - 0.4, 0.002]} />
+            <meshBasicMaterial color="#5a4acc" transparent opacity={0.6} />
+          </mesh>
+          <Text position={[0, -0.06, 0.005]} fontSize={0.11} color="#dde0ff" letterSpacing={0.18} textAlign="center" anchorX="center" anchorY="middle">
+            What Clients Say
+          </Text>
+          <Text position={[0, -0.34, 0.005]} fontSize={0.036} color="#4a4a72" letterSpacing={0.32} textAlign="center" anchorX="center" anchorY="middle">
+            VERIFIED CLIENT REVIEWS
+          </Text>
+        </group>
+
+        {/* ── Slide 1: Maria ───────────────────────────────────── */}
+        <group visible={slide === 1}>
+          <Text position={[-SW / 2 + 0.14, SH / 2 - 0.1, 0.005]} fontSize={0.048} color="#7a5acc" letterSpacing={0.35} anchorX="left" anchorY="middle">
+            01 / MARIA
+          </Text>
+          <Text position={[0, 0.08, 0.005]} fontSize={0.065} color="#dae1f8" maxWidth={SW - 0.18} textAlign="left" anchorX="center" anchorY="middle" lineHeight={1.55}>
+            {`"Returning client for years! Byron achieved everything I was looking for in website design and I'm very pleased. He goes above and beyond, is very engaging when asking questions, and presents multiple designs. Highly recommend for any design, logo, or website project!"`}
+          </Text>
+          <mesh position={[0, -(SH / 2 - 0.24), 0.004]}>
+            <planeGeometry args={[SW - 0.2, 0.002]} />
+            <meshBasicMaterial color="#5a4acc" transparent opacity={0.5} />
+          </mesh>
+          <Text position={[0, -(SH / 2 - 0.1), 0.005]} fontSize={0.068} color="#c8c2ff" anchorX="center" anchorY="middle">
+            Maria  ·  Owner, Lush Brows
+          </Text>
+        </group>
+
+        {/* ── Slide 2: JonnyBeeTV ──────────────────────────────── */}
+        <group visible={slide === 2}>
+          <Text position={[-SW / 2 + 0.14, SH / 2 - 0.1, 0.005]} fontSize={0.048} color="#7a5acc" letterSpacing={0.35} anchorX="left" anchorY="middle">
+            02 / JONNYBEETV
+          </Text>
+          <Text position={[0, 0.08, 0.005]} fontSize={0.065} color="#dae1f8" maxWidth={SW - 0.18} textAlign="left" anchorX="center" anchorY="middle" lineHeight={1.55}>
+            {`"Byron helped tremendously with logos and graphic designs for JonnyBeeTV. He creatively put together my first logo and improved my latest. Very helpful with ideas and advice on planning to advance the platform. Highly recommend his work!"`}
+          </Text>
+          <mesh position={[0, -(SH / 2 - 0.24), 0.004]}>
+            <planeGeometry args={[SW - 0.2, 0.002]} />
+            <meshBasicMaterial color="#5a4acc" transparent opacity={0.5} />
+          </mesh>
+          <Text position={[0, -(SH / 2 - 0.1), 0.005]} fontSize={0.068} color="#c8c2ff" anchorX="center" anchorY="middle">
+            JonnyBeeTV  ·  Media Platform
+          </Text>
+        </group>
+
+        {/* Slide dot indicators */}
+        {[0, 1, 2].map((i) => (
+          <mesh key={i} position={[(i - 1) * 0.09, -(SH / 2 + 0.065), 0.004]}>
+            <circleGeometry args={[0.013, 12]} />
+            <meshBasicMaterial color={slide === i ? "#c8c2ff" : "#2e2e50"} transparent opacity={slide === i ? 0.9 : 0.5} />
+          </mesh>
+        ))}
+      </group>
+    </>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /*  GOAT STATUE                                                        */
@@ -813,6 +1004,9 @@ export default function GalleryRoom({
       <DiamondPedestal position={[17.5, 0, GZ + 0.4]} onClick={() => onOpenPanel?.("enterprise")} />
       <EnvelopePedestal position={[17.5, 0, GZ - 0.4]} onClick={() => onOpenPanel?.("commission")} />
       <PhonePedestal position={[17.5, 0, GZ - 1.2]} onClick={() => onOpenPanel?.("appointments")} />
+
+      {/* Projector + testimonial screen — right gallery wall, x=3 */}
+      <ProjectorDisplay />
 
       {/* Artworks */}
       {ARTWORKS.map((art) => {

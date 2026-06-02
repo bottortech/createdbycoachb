@@ -1,7 +1,9 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
+import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
+import CustomCursor from "../ui/CustomCursor";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
@@ -19,8 +21,9 @@ import ProjectModal, { Project } from "../gallery/ProjectModal";
 import GalleryOverlayPanel from "./GalleryOverlayPanel";
 import GalleryMap from "./GalleryMap";
 import TechVaultMap from "./TechVaultMap";
+import TestimonialProjector from "../sections/TestimonialProjector";
 
-type PanelType = "enterprise" | "studio" | "appointments" | "commission" | "connect" | null;
+type PanelType = "enterprise" | "studio" | "appointments" | "commission" | "connect" | "testimonials" | null;
 
 // Max stop user can reach via scroll/arrows. Vault case stops live past PORTAL_STOP
 // but are only addressable via the TechVaultMap, not by scrolling.
@@ -998,7 +1001,18 @@ export default function GalleryScene() {
             onTributeBenchClick={handleTributeBenchClick}
           />
         </Suspense>
+
+        <EffectComposer>
+          <Bloom
+            luminanceThreshold={0.25}
+            luminanceSmoothing={0.85}
+            intensity={1.1}
+            mipmapBlur
+          />
+        </EffectComposer>
       </Canvas>
+
+      <CustomCursor />
 
       {/* Intro */}
       <AnimatePresence>
@@ -2038,6 +2052,125 @@ export default function GalleryScene() {
           currentCaseKey={currentCaseKey}
         />
       )}
+
+      {/* Testimonial Projector — full-screen overlay */}
+      <TestimonialProjector
+        open={activePanel === "testimonials"}
+        onClose={() => setActivePanel(null)}
+      />
+
+      {/* Testimonial Sidebar — left panel, visible when at/inside the Tech Vault */}
+      <AnimatePresence>
+        {insideVault && !anyOverlayOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: -32 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -32 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="pointer-events-none fixed left-0 top-[44px] bottom-0 z-20 hidden w-[280px] flex-col gap-4 overflow-y-auto px-4 py-6 lg:flex"
+            style={{
+              background:
+                "linear-gradient(to right, rgba(4,5,14,0.88) 80%, transparent 100%)",
+            }}
+          >
+            <div className="pointer-events-none mb-1">
+              <span
+                className="text-[8px] font-medium uppercase tracking-[0.45em]"
+                style={{ color: "rgba(180, 160, 255, 0.7)" }}
+              >
+                Client Testimonials
+              </span>
+              <h3 className="mt-1 text-sm font-extralight tracking-[0.18em] text-gallery-white">
+                What Clients Say
+              </h3>
+            </div>
+
+            {[
+              {
+                quote:
+                  "I'm a returning client of Byron for years now! Ever since he helped create my logo design and event flyers it was only natural I return to him for my website design! He was able to achieve everything I was looking for and I'm very pleased with all of his work! He definitely goes above and beyond to get your projects done in a timely manner. I definitely recommend him for any design, logo, website projects!",
+                name: "Maria",
+                title: "Owner, Lush Brows",
+              },
+              {
+                quote:
+                  "Byron Brown has helped out tremendously with logos and graphic designs to help out my media platform JonnyBeeTV. He creatively put together my first ever logo and also made improvements on my latest logo! Byron has also been very helpful with any ideas and advice on planning to help advance the JonnyBeeTV platform. I highly recommend his work!",
+                name: "JonnyBeeTV",
+                title: "Media Platform",
+              },
+            ].map((t, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, delay: 0.2 + i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+                className="pointer-events-auto relative flex flex-col overflow-hidden rounded-xl p-4"
+                style={{
+                  background: "rgba(7, 10, 22, 0.88)",
+                  border: "1px solid rgba(140, 170, 255, 0.14)",
+                  boxShadow:
+                    "0 4px 24px rgba(60, 90, 200, 0.1), inset 0 0 20px rgba(80, 110, 255, 0.03)",
+                  backdropFilter: "blur(12px)",
+                }}
+              >
+                <div
+                  className="absolute inset-x-0 top-0 h-[1px]"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent 0%, rgba(180, 200, 255, 0.3) 50%, transparent 100%)",
+                  }}
+                />
+                <div
+                  className="mb-2 text-2xl font-serif leading-none"
+                  style={{ color: "rgba(180, 160, 255, 0.45)" }}
+                  aria-hidden="true"
+                >
+                  &ldquo;
+                </div>
+                <p
+                  className="flex-1 text-[11px] leading-[1.7]"
+                  style={{ color: "rgba(218, 225, 248, 0.82)" }}
+                >
+                  {t.quote}
+                </p>
+                <div
+                  className="my-3 h-[1px]"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent 0%, rgba(140, 170, 255, 0.15) 50%, transparent 100%)",
+                  }}
+                />
+                <div className="flex items-center gap-2">
+                  <div
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+                    style={{
+                      background: "rgba(100, 80, 200, 0.2)",
+                      border: "1px solid rgba(160, 140, 255, 0.25)",
+                      color: "rgba(200, 190, 255, 0.9)",
+                    }}
+                  >
+                    {t.name[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div
+                      className="text-[11px] font-semibold tracking-wide"
+                      style={{ color: "rgba(220, 225, 255, 0.9)" }}
+                    >
+                      {t.name}
+                    </div>
+                    <div
+                      className="text-[9px] uppercase tracking-[0.18em]"
+                      style={{ color: "rgba(160, 170, 220, 0.55)" }}
+                    >
+                      {t.title}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Project Modal */}
       <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />
