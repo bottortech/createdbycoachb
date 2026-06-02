@@ -1,7 +1,6 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import * as THREE from "three";
 import CustomCursor from "../ui/CustomCursor";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -1002,14 +1001,7 @@ export default function GalleryScene() {
           />
         </Suspense>
 
-        <EffectComposer>
-          <Bloom
-            luminanceThreshold={0.25}
-            luminanceSmoothing={0.85}
-            intensity={1.1}
-            mipmapBlur
-          />
-        </EffectComposer>
+
       </Canvas>
 
       <CustomCursor />
