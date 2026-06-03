@@ -49,8 +49,6 @@ export const STOPS: GalleryStop[] = [
   { pos: [0, 1.7, 1.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
   // Gallery II — west wing, x=-19..0, same corridor as main gallery (z=-4..+1)
   { pos: [-2, 1.7, GZ],     lookAt: [-16, 1.7, GZ],          label: "Gallery II",            tier: 1 },
-  // Bird's eye — above entry junction showing both wings
-  { pos: [0, 22, GZ],        lookAt: [0, 0, GZ],             label: "Overview",              tier: 2 },
   { pos: [1.5, 1.7, GZ],      lookAt: [8, 1.7, GZ],           label: "Main Gallery",          tier: 1 },
   // Client Reviews — projector/testimonial view inside the main gallery
   { pos: [2.4, 2.2, 0.8],    lookAt: [1.2, 1.72, -3.8],      label: "Client Reviews",        tier: 2 },
@@ -1051,12 +1049,10 @@ export default function GalleryRoom({
 
       {/* Entry right wall kept; left wall removed — Gallery II corridor opens west */}
       <mesh position={[EW, H / 2, 1.2]} rotation={[0, Math.PI, 0]} receiveShadow><planeGeometry args={[2, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
-      {/* Display wall — centered, with opening on right side for gallery access */}
-      {/* Entry back wall — shortened from 4.5m to 3.65m (chopped 0.85m from the
-          right end) so the sight-line past WiggleWoo opens toward the Tech Vault.
-          WiggleWoo piece ends at x=+0.85; wall now ends at x=+0.9. */}
-      <mesh position={[-0.925, H / 2, -1]} receiveShadow><planeGeometry args={[3.65, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
-      <mesh position={[-0.925, H / 2, -1]} rotation={[0, Math.PI, 0]}><planeGeometry args={[3.65, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
+      {/* Display panel — centered on artwork (x=0, width=1.7). Width=1.9m
+          gives 0.1m backing on each side: reads as a focused panel not a wall. */}
+      <mesh position={[0, H / 2, -1]} receiveShadow><planeGeometry args={[1.9, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
+      <mesh position={[0, H / 2, -1]} rotation={[0, Math.PI, 0]}><planeGeometry args={[1.9, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
 
       {/* Main gallery top wall */}
       <mesh position={[10, H / 2, GZ + GW]} rotation={[0, Math.PI, 0]} receiveShadow><planeGeometry args={[20, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
@@ -1088,30 +1084,89 @@ export default function GalleryRoom({
       <mesh position={[-9.5, H - 0.08, GZ]}>
         <boxGeometry args={[19, 0.025, 0.025]} /><meshStandardMaterial color="#222" metalness={0.7} roughness={0.4} />
       </mesh>
-      {/* Spotlights — Gallery II, cooler cinematic tone */}
-      {[-3, -5.5, -8, -10.5, -13, -15.5, -17.5].map((x, i) => (
+      {/* Gallery II — sealed wing, dim blue-gray lighting */}
+      {[-4, -9, -14].map((x, i) => (
         <group key={`g2-sp-${x}`}>
           <mesh position={[x, H - 0.15, GZ]} rotation={[0, 0, (i % 3 - 1) * 0.04]}>
-            <cylinderGeometry args={[0.04, 0.06, 0.1, 8]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.3} />
+            <cylinderGeometry args={[0.04, 0.06, 0.1, 8]} /><meshStandardMaterial color="#222" metalness={0.8} roughness={0.3} />
           </mesh>
           <SpotLightWithTarget
             position={[x, H - 0.2, GZ]}
-            targetPosition={[x, 1.5, i % 2 === 0 ? GZ + GW - 0.3 : GZ - GW + 0.3]}
-            intensity={18} angle={0.65} penumbra={0.7} distance={10} castShadow={false}
-            color="#b8ccff"
+            targetPosition={[x, 1.5, GZ]}
+            intensity={5} angle={0.7} penumbra={0.9} distance={8} castShadow={false}
+            color="#8899bb"
           />
         </group>
       ))}
-      {/* Placeholder frames — north wall (z=+1), mirrors main gallery top wall positions */}
-      {[-6, -8, -10.5, -12.5, -15.5].map((x) => (
-        <PlaceholderFrame key={`g2N-${x}`} position={[x, 1.88, GZ + GW]} rotation={[0, Math.PI, 0]} width={1.1} height={0.82} label="Project TBA" />
-      ))}
-      {/* Placeholder frames — south wall (z=-4), mirrors main gallery bottom wall positions */}
-      {[-7, -9, -11.5, -14].map((x) => (
-        <PlaceholderFrame key={`g2S-${x}`} position={[x, 1.88, GZ - GW]} rotation={[0, 0, 0]} width={1.1} height={0.82} label="Project TBA" />
-      ))}
-      {/* Ambient fill */}
-      <pointLight position={[-9.5, 2.4, GZ]} intensity={0.6} distance={16} color="#f0e8d8" />
+
+      {/* Velvet rope barrier — posts span corridor width (z-axis), rope reads head-on from entry camera */}
+      <group position={[-6, 0, 0]}>
+        {/* South post (near z=-4 wall) */}
+        <mesh position={[0, 0.6, GZ - GW + 0.5]}>
+          <cylinderGeometry args={[0.04, 0.04, 1.2, 8]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
+        </mesh>
+        <mesh position={[0, 1.22, GZ - GW + 0.5]}>
+          <sphereGeometry args={[0.07, 10, 10]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
+        </mesh>
+        {/* North post (near z=+1 wall) */}
+        <mesh position={[0, 0.6, GZ + GW - 0.5]}>
+          <cylinderGeometry args={[0.04, 0.04, 1.2, 8]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
+        </mesh>
+        <mesh position={[0, 1.22, GZ + GW - 0.5]}>
+          <sphereGeometry args={[0.07, 10, 10]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
+        </mesh>
+        {/* Rope in z-direction — rotation [PI/2,0,0] makes cylinder run along Z */}
+        <mesh position={[0, 0.9, GZ]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.018, 0.018, GW * 2 - 1, 8]} />
+          <meshStandardMaterial color="#8b1a1a" metalness={0.2} roughness={0.8} />
+        </mesh>
+      </group>
+
+      {/* Announcement sign — rotation [0,PI/2,0] makes it face east (+x) toward incoming camera */}
+      <group position={[-11, 0, GZ]} rotation={[0, Math.PI / 2, 0]}>
+        {/* Stand */}
+        <mesh position={[0, 0.5, 0]}>
+          <cylinderGeometry args={[0.025, 0.025, 1.0, 8]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
+        </mesh>
+        <mesh position={[0, 0.01, 0]}>
+          <boxGeometry args={[0.5, 0.04, 0.5]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.8} roughness={0.2} />
+        </mesh>
+        {/* Gold frame border */}
+        <mesh position={[0, 1.55, -0.02]}>
+          <boxGeometry args={[2.96, 1.26, 0.04]} />
+          <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
+        </mesh>
+        {/* Dark panel */}
+        <mesh position={[0, 1.55, 0.01]}>
+          <boxGeometry args={[2.8, 1.1, 0.05]} />
+          <meshStandardMaterial color="#0a0a12" metalness={0.3} roughness={0.7} />
+        </mesh>
+        <Text position={[0, 1.73, 0.045]} fontSize={0.16} color="rgba(201,168,76,0.9)" letterSpacing={0.35} textAlign="center" anchorX="center" anchorY="middle">
+          GALLERY II
+        </Text>
+        <Text position={[0, 1.50, 0.045]} fontSize={0.09} color="rgba(180,190,210,0.6)" letterSpacing={0.25} textAlign="center" anchorX="center" anchorY="middle">
+          OPENING SOON
+        </Text>
+        <Text position={[0, 1.32, 0.045]} fontSize={0.055} color="rgba(140,150,170,0.4)" letterSpacing={0.15} textAlign="center" anchorX="center" anchorY="middle">
+          New work coming
+        </Text>
+      </group>
+      {/* Spotlight on the sign, angled from above toward the sign face */}
+      <SpotLightWithTarget
+        position={[-7, H - 0.2, GZ]}
+        targetPosition={[-11, 1.55, GZ]}
+        intensity={14} angle={0.38} penumbra={0.55} distance={8} castShadow={false}
+        color="#c9a84c"
+      />
+
+      {/* Very faint ambient so the wing isn't pitch black */}
+      <pointLight position={[-9.5, 2.2, GZ]} intensity={0.25} distance={20} color="#6070a0" />
 
       {/* Bottom gallery wall — split around the Tech Vault doorway (x=3..5, 2m wide) */}
       <mesh position={[1.5, H / 2, GZ - GW]} receiveShadow><planeGeometry args={[3, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
