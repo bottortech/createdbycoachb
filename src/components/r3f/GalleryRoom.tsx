@@ -1019,9 +1019,10 @@ export default function GalleryRoom({
       <hemisphereLight intensity={0.9} color="#ffe8cc" groundColor="#3a2a18" />
       <fog attach="fog" args={["#1a1a1a", 8, 25]} />
 
-      {/* Floor — reflective */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[8, 0, 0]} receiveShadow>
-        <planeGeometry args={[35, 15]} />
+      {/* Main Gallery floor — reflective, scoped to corridor (x=0..19, z=-4..+1).
+          Shrunk from the old 35×15 plane to prevent Z-fighting with Gallery II floor. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[9.5, 0, GZ]} receiveShadow>
+        <planeGeometry args={[19, GW * 2]} />
         <MeshReflectorMaterial
           map={floorTex}
           color="#908478"
@@ -1037,10 +1038,20 @@ export default function GalleryRoom({
           maxDepthThreshold={1.4}
         />
       </mesh>
+      {/* Entry chamber floor — standard material, no overlap */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.5]} receiveShadow>
+        <planeGeometry args={[6, 6]} />
+        <meshStandardMaterial map={floorTex} color="#908478" metalness={0.4} roughness={0.55} />
+      </mesh>
 
-      {/* Ceiling */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[8, H, 0]}>
-        <planeGeometry args={[35, 15]} />
+      {/* Main Gallery ceiling — scoped to corridor only, matches floor */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[9.5, H, GZ]}>
+        <planeGeometry args={[19, GW * 2]} />
+        <meshStandardMaterial map={ceilingTex} color="#807468" />
+      </mesh>
+      {/* Entry chamber ceiling */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, H, 0.5]}>
+        <planeGeometry args={[6, 6]} />
         <meshStandardMaterial map={ceilingTex} color="#807468" />
       </mesh>
 
