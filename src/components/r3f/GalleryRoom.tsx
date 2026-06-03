@@ -2,7 +2,7 @@
 
 import { useRef, useMemo, useState, useEffect } from "react";
 import { useFrame, useThree, useLoader } from "@react-three/fiber";
-import { useTexture, Html, Text } from "@react-three/drei";
+import { useTexture, Html, Text, MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
 import dynamic from "next/dynamic";
 import { TDSLoader } from "three/examples/jsm/loaders/TDSLoader.js";
@@ -47,7 +47,13 @@ const GZ = -1.5;
 
 export const STOPS: GalleryStop[] = [
   { pos: [0, 1.7, 1.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
-  { pos: [2.4, 2.2, 0.8],     lookAt: [1.2, 1.72, -3.8],      label: "Main Gallery",          tier: 1 },
+  // Gallery II — west wing, x=-19..0, same corridor as main gallery (z=-4..+1)
+  { pos: [-2, 1.7, GZ],     lookAt: [-16, 1.7, GZ],          label: "Gallery II",            tier: 1 },
+  // Bird's eye — above entry junction showing both wings
+  { pos: [0, 22, GZ],        lookAt: [0, 0, GZ],             label: "Overview",              tier: 2 },
+  { pos: [1.5, 1.7, GZ],      lookAt: [8, 1.7, GZ],           label: "Main Gallery",          tier: 1 },
+  // Client Reviews — projector/testimonial view inside the main gallery
+  { pos: [2.4, 2.2, 0.8],    lookAt: [1.2, 1.72, -3.8],      label: "Client Reviews",        tier: 2 },
   // Tech Vault — side alcove branching off the bottom wall at the x=3..5 doorway.
   // Camera sits in the gallery just north of the widened doorway, elevated (y=2.5)
   // so the sight-line clears the lintel (y=2.6) and frames all 7 vitrines through the opening.
@@ -386,6 +392,81 @@ function ProjectorDisplay() {
         ))}
       </group>
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  VAULT PULSE — ambient breathing light in the Tech Vault hub        */
+/* ------------------------------------------------------------------ */
+
+function VaultPulse() {
+  const lightRef = useRef<THREE.PointLight>(null);
+  useFrame(({ clock }) => {
+    if (lightRef.current) {
+      lightRef.current.intensity = 1.8 + Math.sin(clock.getElapsedTime() * 0.7) * 0.9;
+    }
+  });
+  return <pointLight ref={lightRef} position={[4, 2.2, -5]} color="#6040ff" intensity={1.8} distance={9} />;
+}
+
+/* ------------------------------------------------------------------ */
+/*  PLACEHOLDER FRAMES — top wall x=1.5..5, awaiting real artwork     */
+/* ------------------------------------------------------------------ */
+
+function PlaceholderFrame({
+  position,
+  rotation,
+  width = 1.0,
+  height = 0.78,
+  label = "In Development",
+}: {
+  position: [number, number, number];
+  rotation: [number, number, number];
+  width?: number;
+  height?: number;
+  label?: string;
+}) {
+  const pad = 0.048;
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Gold frame */}
+      <mesh position={[0, 0, -0.014]}>
+        <boxGeometry args={[width + pad * 2, height + pad * 2, 0.014]} />
+        <meshStandardMaterial color="#c9a84c" metalness={0.82} roughness={0.2} />
+      </mesh>
+      {/* Dark canvas */}
+      <mesh>
+        <planeGeometry args={[width, height]} />
+        <meshStandardMaterial color="#080810" />
+      </mesh>
+      {/* Subtle inner border */}
+      <mesh position={[0, 0, 0.001]}>
+        <planeGeometry args={[width - 0.04, height - 0.04]} />
+        <meshBasicMaterial color="#0e0e18" transparent opacity={0.0} />
+      </mesh>
+      <Text
+        position={[0, 0.06, 0.003]}
+        fontSize={0.055}
+        color="rgba(201,168,76,0.35)"
+        letterSpacing={0.28}
+        textAlign="center"
+        anchorX="center"
+        anchorY="middle"
+      >
+        COMING SOON
+      </Text>
+      <Text
+        position={[0, -0.07, 0.003]}
+        fontSize={0.038}
+        color="rgba(160,160,190,0.22)"
+        letterSpacing={0.12}
+        textAlign="center"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {label}
+      </Text>
+    </group>
   );
 }
 
@@ -868,8 +949,8 @@ export default function GalleryRoom({
     // proportionally more time so they read as smooth cinematic pans.
     if (snapping && !wasSnapping.current) {
       const d = Math.abs(target - smoothProgress.current);
-      snapPosRate.current = Math.max(3.5, 10 - d * 0.6);
-      snapLookRate.current = Math.max(4.5, 12 - d * 0.7);
+      snapPosRate.current = Math.max(2.2, 7 - d * 0.5);
+      snapLookRate.current = Math.max(3.0, 9 - d * 0.6);
       wasSnapping.current = true;
     } else if (!snapping) {
       wasSnapping.current = false;
@@ -940,10 +1021,23 @@ export default function GalleryRoom({
       <hemisphereLight intensity={0.9} color="#ffe8cc" groundColor="#3a2a18" />
       <fog attach="fog" args={["#1a1a1a", 8, 25]} />
 
-      {/* Floor — subtle metallic */}
+      {/* Floor — reflective */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[8, 0, 0]} receiveShadow>
         <planeGeometry args={[35, 15]} />
-        <meshStandardMaterial map={floorTex} color="#908478" metalness={0.4} roughness={0.55} />
+        <MeshReflectorMaterial
+          map={floorTex}
+          color="#908478"
+          roughness={0.65}
+          metalness={0.3}
+          mirror={0.35}
+          blur={[400, 150]}
+          resolution={512}
+          mixBlur={0.9}
+          mixStrength={1.2}
+          depthScale={1.0}
+          minDepthThreshold={0.4}
+          maxDepthThreshold={1.4}
+        />
       </mesh>
 
       {/* Ceiling */}
@@ -952,9 +1046,10 @@ export default function GalleryRoom({
         <meshStandardMaterial map={ceilingTex} color="#807468" />
       </mesh>
 
-      {/* Entry chamber */}
+      {/* Entry chamber — front wall restored to full width */}
       <mesh position={[0, H / 2, 2]}><planeGeometry args={[EW * 2, H]} /><meshStandardMaterial color="#4a4440" /></mesh>
-      <mesh position={[-EW, H / 2, 0.5]} receiveShadow><planeGeometry args={[3.5, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
+
+      {/* Entry right wall kept; left wall removed — Gallery II corridor opens west */}
       <mesh position={[EW, H / 2, 1.2]} rotation={[0, Math.PI, 0]} receiveShadow><planeGeometry args={[2, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
       {/* Display wall — centered, with opening on right side for gallery access */}
       {/* Entry back wall — shortened from 4.5m to 3.65m (chopped 0.85m from the
@@ -963,8 +1058,61 @@ export default function GalleryRoom({
       <mesh position={[-0.925, H / 2, -1]} receiveShadow><planeGeometry args={[3.65, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
       <mesh position={[-0.925, H / 2, -1]} rotation={[0, Math.PI, 0]}><planeGeometry args={[3.65, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
 
-      {/* Main gallery */}
+      {/* Main gallery top wall */}
       <mesh position={[10, H / 2, GZ + GW]} rotation={[0, Math.PI, 0]} receiveShadow><planeGeometry args={[20, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
+
+      {/* ── Gallery II — west wing, x=-19..0, same corridor as Main Gallery ────────
+          North wall z=+1, South wall z=-4, runs in -X direction from entry.
+          Bird's eye: [Gallery II x=-19..0] [entry] [Main Gallery x=0..19]      */}
+      {/* North wall (z=+1, faces -z, same as main gallery top wall) */}
+      <mesh position={[-9.5, H / 2, GZ + GW]} rotation={[0, Math.PI, 0]} receiveShadow>
+        <planeGeometry args={[19, H]} /><meshStandardMaterial map={wallTex} color={wc} />
+      </mesh>
+      {/* South wall (z=-4, faces +z, same as main gallery bottom wall) */}
+      <mesh position={[-9.5, H / 2, GZ - GW]} receiveShadow>
+        <planeGeometry args={[19, H]} /><meshStandardMaterial map={wallTex} color={wc} />
+      </mesh>
+      {/* West end wall (x=-19, faces +x into corridor) */}
+      <mesh position={[-19, H / 2, GZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[GW * 2, H]} /><meshStandardMaterial map={wallTex} color={wc} />
+      </mesh>
+      {/* Floor extension */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-9.5, 0, GZ]} receiveShadow>
+        <planeGeometry args={[19, GW * 2]} /><meshStandardMaterial map={floorTex} color="#908478" metalness={0.4} roughness={0.55} />
+      </mesh>
+      {/* Ceiling extension */}
+      <mesh position={[-9.5, H, GZ]} rotation={[Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[19, GW * 2]} /><meshStandardMaterial map={ceilingTex} color="#807468" />
+      </mesh>
+      {/* Ceiling track rail */}
+      <mesh position={[-9.5, H - 0.08, GZ]}>
+        <boxGeometry args={[19, 0.025, 0.025]} /><meshStandardMaterial color="#222" metalness={0.7} roughness={0.4} />
+      </mesh>
+      {/* Spotlights — Gallery II, cooler cinematic tone */}
+      {[-3, -5.5, -8, -10.5, -13, -15.5, -17.5].map((x, i) => (
+        <group key={`g2-sp-${x}`}>
+          <mesh position={[x, H - 0.15, GZ]} rotation={[0, 0, (i % 3 - 1) * 0.04]}>
+            <cylinderGeometry args={[0.04, 0.06, 0.1, 8]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.3} />
+          </mesh>
+          <SpotLightWithTarget
+            position={[x, H - 0.2, GZ]}
+            targetPosition={[x, 1.5, i % 2 === 0 ? GZ + GW - 0.3 : GZ - GW + 0.3]}
+            intensity={18} angle={0.65} penumbra={0.7} distance={10} castShadow={false}
+            color="#b8ccff"
+          />
+        </group>
+      ))}
+      {/* Placeholder frames — north wall (z=+1), mirrors main gallery top wall positions */}
+      {[-6, -8, -10.5, -12.5, -15.5].map((x) => (
+        <PlaceholderFrame key={`g2N-${x}`} position={[x, 1.88, GZ + GW]} rotation={[0, Math.PI, 0]} width={1.1} height={0.82} label="Project TBA" />
+      ))}
+      {/* Placeholder frames — south wall (z=-4), mirrors main gallery bottom wall positions */}
+      {[-7, -9, -11.5, -14].map((x) => (
+        <PlaceholderFrame key={`g2S-${x}`} position={[x, 1.88, GZ - GW]} rotation={[0, 0, 0]} width={1.1} height={0.82} label="Project TBA" />
+      ))}
+      {/* Ambient fill */}
+      <pointLight position={[-9.5, 2.4, GZ]} intensity={0.6} distance={16} color="#f0e8d8" />
+
       {/* Bottom gallery wall — split around the Tech Vault doorway (x=3..5, 2m wide) */}
       <mesh position={[1.5, H / 2, GZ - GW]} receiveShadow><planeGeometry args={[3, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
       <mesh position={[12.5, H / 2, GZ - GW]} receiveShadow><planeGeometry args={[15, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>
@@ -1004,6 +1152,7 @@ export default function GalleryRoom({
       <DiamondPedestal position={[17.5, 0, GZ + 0.4]} onClick={() => onOpenPanel?.("enterprise")} />
       <EnvelopePedestal position={[17.5, 0, GZ - 0.4]} onClick={() => onOpenPanel?.("commission")} />
       <PhonePedestal position={[17.5, 0, GZ - 1.2]} onClick={() => onOpenPanel?.("appointments")} />
+
 
       {/* Projector + testimonial screen — right gallery wall, x=3 */}
       <ProjectorDisplay />
@@ -1128,6 +1277,7 @@ export default function GalleryRoom({
 
       {/* Tech Vault — dedicated alcove branching off the top wall at x=3..4 */}
       <TechVault />
+      <VaultPulse />
 
     </>
   );

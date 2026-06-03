@@ -2,7 +2,6 @@
 
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
-import CustomCursor from "../ui/CustomCursor";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
@@ -1003,8 +1002,6 @@ export default function GalleryScene() {
 
 
       </Canvas>
-
-      <CustomCursor />
 
       {/* Intro */}
       <AnimatePresence>
