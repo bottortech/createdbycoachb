@@ -1038,9 +1038,10 @@ export default function GalleryRoom({
           maxDepthThreshold={1.4}
         />
       </mesh>
-      {/* Entry chamber floor — standard material, no overlap */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.5]} receiveShadow>
-        <planeGeometry args={[6, 6]} />
+      {/* Entry chamber floor — only the front lobby strip z=+1..+2.
+          The corridor floors (Main Gallery + Gallery II) already cover z=-4..+1. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 1.5]} receiveShadow>
+        <planeGeometry args={[6, 1]} />
         <meshStandardMaterial map={floorTex} color="#908478" metalness={0.4} roughness={0.55} />
       </mesh>
 
@@ -1049,9 +1050,9 @@ export default function GalleryRoom({
         <planeGeometry args={[19, GW * 2]} />
         <meshStandardMaterial map={ceilingTex} color="#807468" />
       </mesh>
-      {/* Entry chamber ceiling */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, H, 0.5]}>
-        <planeGeometry args={[6, 6]} />
+      {/* Entry chamber ceiling — front lobby strip only, matches floor */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, H, 1.5]}>
+        <planeGeometry args={[6, 1]} />
         <meshStandardMaterial map={ceilingTex} color="#807468" />
       </mesh>
 
