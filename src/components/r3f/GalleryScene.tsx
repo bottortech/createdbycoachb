@@ -16,6 +16,9 @@ import {
   TRIBUTE_PHOTO,
 } from "./TributeRoom";
 import ProjectModal, { Project } from "../gallery/ProjectModal";
+import PredictionModal from "../PredictionModal";
+import { PREDICTIONS } from "@/data/predictions";
+import type { PredictionMeta } from "@/types/prediction";
 import GalleryOverlayPanel from "./GalleryOverlayPanel";
 import GalleryMap from "./GalleryMap";
 import TechVaultMap from "./TechVaultMap";
@@ -94,6 +97,7 @@ function guidedDwellMs(stop: (typeof STOPS)[number]): number {
 export default function GalleryScene() {
   const [entered, setEntered] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedPrediction, setSelectedPrediction] = useState<PredictionMeta | null>(null);
   const [activePanel, setActivePanel] = useState<PanelType>(null);
   const [musicPlaying, setMusicPlaying] = useState(false);
   // Starts in manual; user opts into guided via the map or toggle.
@@ -300,7 +304,7 @@ export default function GalleryScene() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const portalReturnStop = useRef<number>(PORTAL_STOP);
   const snapRef = useRef(false);
-  const anyOverlayOpen = !!selectedProject || !!activePanel;
+  const anyOverlayOpen = !!selectedProject || !!selectedPrediction || !!activePanel;
 
   // Sync ref with state (ref for non-render reads, state for passing to Canvas).
   // Clamp to the full STOPS range so the map can directly address hidden stops
@@ -997,6 +1001,10 @@ export default function GalleryScene() {
             onHireMe={() => setActivePanel("commission")}
             onTributePortalClick={handleTributePortalClick}
             onTributeBenchClick={handleTributeBenchClick}
+            onSelectPrediction={(slug) => {
+              const found = PREDICTIONS.find((p) => p.slug === slug) ?? null;
+              setSelectedPrediction(found);
+            }}
           />
         </Suspense>
 
@@ -2052,6 +2060,9 @@ export default function GalleryScene() {
 
       {/* Project Modal */}
       <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />
+
+      {/* Prediction Modal */}
+      <PredictionModal prediction={selectedPrediction} onClose={() => setSelectedPrediction(null)} />
 
       {/* Overlay Panels */}
       <GalleryOverlayPanel open={activePanel === "enterprise"} onClose={() => setActivePanel(null)} label="Enterprise Hall" title="Bottor Technologies Inc.">

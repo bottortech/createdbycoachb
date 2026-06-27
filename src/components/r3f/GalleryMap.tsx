@@ -21,6 +21,8 @@ const STOP_META: Record<string, { thumb: string; type: string }> = {
   "Services":               { thumb: "/images/coachb-services.png",       type: "Services & Contact" },
   "Tech Vault":             { thumb: "/images/techvault-logo.png",        type: "Skills & Tech Stack" },
   "Client Reviews":         { thumb: "/images/coachb-services.png",       type: "Client Testimonials" },
+  "AI Predictions Wing":    { thumb: "/images/coachb-services.png",       type: "AI Predictions Exhibit" },
+  "The Authenticity Shift": { thumb: "/images/coachb-services.png",       type: "AI Prediction #001" },
 };
 
 interface GalleryMapProps {

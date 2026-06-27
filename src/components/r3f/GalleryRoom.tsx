@@ -21,6 +21,7 @@ const FoundersStudy = dynamic(() => import("./FoundersStudy"), { ssr: false });
 // JSX, restore the "In Memory" and "Memorial Pendant" STOPS, and put
 // the matching entries back in GalleryMap's STOP_META.
 import TechVault from "./TechVault";
+const PredictionsWing = dynamic(() => import("./PredictionsWing"), { ssr: false });
 
 /* ------------------------------------------------------------------ */
 /*  STOPS — narrative order, spatial positions                         */
@@ -47,11 +48,15 @@ const GZ = -1.5;
 
 export const STOPS: GalleryStop[] = [
   { pos: [0, 1.7, 1.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
-  // Gallery II — west wing, x=-19..0, same corridor as main gallery (z=-4..+1)
-  { pos: [-2, 1.7, GZ],     lookAt: [-16, 1.7, GZ],          label: "Gallery II",            tier: 1 },
   { pos: [1.5, 1.7, GZ],      lookAt: [8, 1.7, GZ],           label: "Main Gallery",          tier: 1 },
   // Client Reviews — projector/testimonial view inside the main gallery
   { pos: [2.4, 2.2, 0.8],    lookAt: [1.2, 1.72, -3.8],      label: "Client Reviews",        tier: 2 },
+  // AI Predictions Wing — south alcove branching off the gallery at z=-4, x=-3.5..-1.5 doorway.
+  // Camera sits north of doorway, elevated, looking south into the alcove.
+  { pos: [-2.5, 2.5, -3.5],   lookAt: [-2.5, 1.0, -7],        label: "AI Predictions Wing",   tier: 2 },
+  { pos: [-2.5, 1.7, -6],     lookAt: [-2.5, 1.7, -8.5],      label: "The Authenticity Shift", tier: 3 },
+  // Gallery II — west wing (visited after predictions alcove)
+  { pos: [-2, 1.7, GZ],      lookAt: [-16, 1.7, GZ],          label: "Gallery II",            tier: 1 },
   // Tech Vault — side alcove branching off the bottom wall at the x=3..5 doorway.
   // Camera sits in the gallery just north of the widened doorway, elevated (y=2.5)
   // so the sight-line clears the lintel (y=2.6) and frames all 7 vitrines through the opening.
@@ -656,6 +661,8 @@ interface GalleryRoomProps {
   /** Fires when the wooden bench inside the tribute room is clicked. Parent
    *  toggles between standing-entry and seated camera views. */
   onTributeBenchClick?: () => void;
+  /** Fires when a prediction frame in the Predictions Wing is clicked. */
+  onSelectPrediction?: (slug: string) => void;
 }
 
 export default function GalleryRoom({
@@ -691,6 +698,7 @@ export default function GalleryRoom({
   studyHighlightedBookIdx = -1,
   onTributePortalClick,
   onTributeBenchClick,
+  onSelectPrediction,
 }: GalleryRoomProps) {
   const { camera } = useThree();
 
@@ -1076,12 +1084,20 @@ export default function GalleryRoom({
       <mesh position={[-9.5, H / 2, GZ + GW]} rotation={[0, Math.PI, 0]} receiveShadow>
         <planeGeometry args={[19, H]} /><meshStandardMaterial map={wallTex} color={wc} />
       </mesh>
-      {/* South wall (z=-4, faces +z, same as main gallery bottom wall) */}
-      <mesh position={[-9.5, H / 2, GZ - GW]} receiveShadow>
-        <planeGeometry args={[19, H]} /><meshStandardMaterial map={wallTex} color={wc} />
+      {/* South wall (z=-4) — split by AI Predictions Wing doorway at x=-3.5..-1.5 */}
+      {/* Left of doorway: x=-19 to x=-3.5 */}
+      <mesh position={[-11.25, H / 2, GZ - GW]} receiveShadow>
+        <planeGeometry args={[15.5, H]} /><meshStandardMaterial map={wallTex} color={wc} />
       </mesh>
-      {/* West end wall (x=-19, faces +x into corridor) */}
-      <mesh position={[-19, H / 2, GZ]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+      {/* Right of doorway: x=-1.5 to x=0 */}
+      <mesh position={[-0.75, H / 2, GZ - GW]} receiveShadow>
+        <planeGeometry args={[1.5, H]} /><meshStandardMaterial map={wallTex} color={wc} />
+      </mesh>
+      {/* West end wall of Gallery II — restored now that PredictionsWing is a separate south alcove */}
+      <mesh position={[-19, H / 2, GZ]} rotation={[0, -Math.PI / 2, 0]} receiveShadow>
+        <planeGeometry args={[GW * 2, H]} /><meshStandardMaterial map={wallTex} color={wc} />
+      </mesh>
+      <mesh position={[-19, H / 2, GZ]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[GW * 2, H]} /><meshStandardMaterial map={wallTex} color={wc} />
       </mesh>
       {/* Floor extension */}
@@ -1345,6 +1361,9 @@ export default function GalleryRoom({
       {/* Tech Vault — dedicated alcove branching off the top wall at x=3..4 */}
       <TechVault />
       <VaultPulse />
+
+      {/* AI Predictions Wing — south alcove at x=-5..0, z=-9..-4, doorway at x=-3.5..-1.5 */}
+      <PredictionsWing onSelectPrediction={onSelectPrediction ?? (() => {})} />
 
     </>
   );
