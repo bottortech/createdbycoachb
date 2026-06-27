@@ -3,6 +3,7 @@ import Link from "next/link";
 import { compileMDX } from "next-mdx-remote/rsc";
 import { getAllPredictionMeta, getPredictionRaw } from "@/lib/predictions";
 import Container from "@/components/Container";
+import ShareButtons from "@/components/ShareButtons";
 import type { PredictionMeta } from "@/types/prediction";
 
 interface Props {
@@ -15,15 +16,39 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const raw = getPredictionRaw(slug);
-  if (!raw) return {};
-  const { frontmatter } = await compileMDX<PredictionMeta>({
-    source: raw,
-    options: { parseFrontmatter: true },
-  });
+  const predictions = getAllPredictionMeta();
+  const prediction = predictions.find((p) => p.slug === slug);
+  if (!prediction) return {};
+
+  const title = `AI Prediction ${prediction.number}: ${prediction.title} | Created by Coach B`;
+  const description = prediction.summary;
+  const url = `https://createdbycoachb.com/predictions/${slug}`;
+  const ogImage = {
+    url: `/images/og-default.png`,
+    width: 1200,
+    height: 630,
+    alt: prediction.title,
+  };
+
   return {
-    title: `AI Prediction ${frontmatter.number}: ${frontmatter.title} | Created by Coach B`,
-    description: frontmatter.summary,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: "Created by Coach B",
+      type: "article",
+      publishedTime: prediction.date ? new Date(prediction.date + "T12:00:00").toISOString() : undefined,
+      tags: prediction.tags,
+      images: [ogImage],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImage.url],
+    },
   };
 }
 
@@ -301,9 +326,23 @@ export default async function PredictionArticlePage({ params }: Props) {
             </header>
 
             {/* ── Article body ── */}
-            <article style={{ paddingBottom: "6rem" }}>
+            <article style={{ paddingBottom: "4rem" }}>
               {content}
             </article>
+
+            {/* ── Share row ── */}
+            <div
+              style={{
+                paddingBottom: "3rem",
+                borderTop: "1px solid rgba(255,255,255,0.06)",
+                paddingTop: "2rem",
+              }}
+            >
+              <ShareButtons
+                url={`https://createdbycoachb.com/predictions/${slug}`}
+                title={`AI Prediction ${frontmatter.number}: ${frontmatter.title} — Created by Coach B`}
+              />
+            </div>
 
             {/* ── Footer CTA ── */}
             <footer

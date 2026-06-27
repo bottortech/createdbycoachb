@@ -2,10 +2,35 @@ import Link from "next/link";
 import { getAllPredictionMeta } from "@/lib/predictions";
 import Container from "@/components/Container";
 
-export const metadata = {
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
   title: "AI Predictions | Created by Coach B",
   description:
     "Future-focused essays, frameworks, and predictions about AI, creativity, business, technology, and society.",
+  openGraph: {
+    title: "AI Predictions | Created by Coach B",
+    description:
+      "Future-focused essays, frameworks, and predictions about AI, creativity, business, technology, and society.",
+    url: "https://createdbycoachb.com/predictions",
+    siteName: "Created by Coach B",
+    type: "website",
+    images: [
+      {
+        url: "/images/og-default.png",
+        width: 1200,
+        height: 630,
+        alt: "AI Predictions — Created by Coach B",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Predictions | Created by Coach B",
+    description:
+      "Future-focused essays, frameworks, and predictions about AI, creativity, business, technology, and society.",
+    images: ["/images/og-default.png"],
+  },
 };
 
 export default function PredictionsPage() {

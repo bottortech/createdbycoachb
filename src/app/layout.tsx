@@ -26,12 +26,21 @@ export const metadata: Metadata = {
     siteName: "Created by Coach B",
     locale: "en_US",
     type: "website",
+    images: [
+      {
+        url: "/images/og-default.png",
+        width: 1200,
+        height: 630,
+        alt: "Created by Coach B — The Gallery",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Created by Coach B | The Gallery",
     description:
       "Builder. Designer. Founder. Author. Creating products, systems, and experiences that solve real problems and push ideas forward.",
+    images: ["/images/og-default.png"],
   },
   icons: {
     icon: "/favicon.ico",
