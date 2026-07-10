@@ -1,3 +1,5 @@
+import SiteFooter from "@/components/SiteFooter";
+
 export default function PredictionsLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
@@ -5,6 +7,7 @@ export default function PredictionsLayout({ children }: { children: React.ReactN
         body { overflow: auto !important; height: auto !important; }
       `}</style>
       {children}
+      <SiteFooter />
     </>
   );
 }

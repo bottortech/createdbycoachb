@@ -138,9 +138,14 @@ export default function StandardPage() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-gallery-white mb-7 leading-[1.15] tracking-tight max-w-2xl">
               Created by Coach B
             </h1>
-            <p className="text-gallery-muted text-lg leading-relaxed max-w-xl mb-10">
+            <p className="text-gallery-muted text-lg leading-relaxed max-w-xl mb-5">
               Builder. Designer. Founder. Author. Creating products, systems, and experiences
               that solve real problems and push ideas forward.
+            </p>
+            <p className="text-gallery-muted/70 text-[13px] leading-relaxed max-w-xl mb-10">
+              Created by Coach B is the web development portfolio of Bottor Technologies Inc.,
+              showcasing custom websites, web applications, and digital solutions built for
+              businesses and organizations.
             </p>
             <div className="flex flex-wrap gap-2.5 mb-14">
               {["Web Apps", "AI Tools", "Brand Identity", "Games", "Books", "Chrome Extensions"].map((tag) => (
@@ -356,8 +361,16 @@ export default function StandardPage() {
       {/* ── Footer ── */}
       <footer className="relative z-10 border-t border-white/5">
         <Container className="py-10 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <span className="text-[10px] uppercase tracking-[0.3em] text-gallery-muted">
-            © {mounted ? new Date().getFullYear() : "2026"} Created by Coach B
+          <span className="text-[12px] text-gallery-muted text-center sm:text-left">
+            © {mounted ? new Date().getFullYear() : "2026"} Created by Coach B — Designed &amp; Developed by{" "}
+            <a
+              href="https://bottortechnologies.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gallery-muted underline decoration-gallery-muted/30 underline-offset-2 transition-colors duration-200 hover:text-gallery-accent hover:decoration-gallery-accent/50"
+            >
+              Bottor Technologies Inc.
+            </a>
           </span>
           <Link
             href="/"
