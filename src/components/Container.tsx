@@ -6,10 +6,10 @@ import type { ReactNode } from "react";
  * Breakpoints:
  *   mobile  (<640px):   20px horizontal padding
  *   tablet  (640-1023): 32px
- *   laptop  (1024-1279):48px
- *   desktop (1280px+):  64px
+ *   desktop (1024px+):  64px
  *
- * Max content width: 1280px, centered.
+ * Max content width: 1400px, centered. Screens wider than that get extra
+ * centering margin on top of the padding for free (mx-auto).
  */
 interface ContainerProps {
   children: ReactNode;
@@ -19,7 +19,7 @@ interface ContainerProps {
 export default function Container({ children, className = "" }: ContainerProps) {
   return (
     <div
-      className={`mx-auto w-full max-w-[1280px] px-5 sm:px-8 lg:px-12 xl:px-16 ${className}`.trim()}
+      className={`mx-auto w-full max-w-350 px-5 sm:px-8 lg:px-16 ${className}`.trim()}
     >
       {children}
     </div>
