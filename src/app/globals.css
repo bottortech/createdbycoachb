@@ -16,10 +16,15 @@
   --color-gallery-spotlight: rgba(255, 255, 255, 0.06);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Must be layered (not a bare unlayered rule) — unlayered CSS always beats
+ * layered CSS regardless of specificity or source order, which was silently
+ * zeroing out every margin/padding utility (px-*, py-*, mb-*, etc.) sitewide. */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 }
 
 html {
