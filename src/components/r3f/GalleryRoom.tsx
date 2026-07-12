@@ -49,8 +49,15 @@ const GZ = -1.5;
 export const STOPS: GalleryStop[] = [
   { pos: [0, 1.7, 1.5],      lookAt: [0, 1.7, -1],           label: "WiggleWoo's Word Quest", tier: 1 },
   { pos: [1.5, 1.7, GZ],      lookAt: [8, 1.7, GZ],           label: "Main Gallery",          tier: 1 },
-  // Client Reviews — projector/testimonial view inside the main gallery
-  { pos: [2.4, 2.2, 0.8],    lookAt: [1.2, 1.72, -3.8],      label: "Client Reviews",        tier: 2 },
+  // Client Reviews — projector/testimonial view inside the main gallery.
+  // x=2.4 (offset from the screen's own x=1.2) keeps the sightline clear of
+  // the projector prop at (1.2,-0.8), which sits directly between a
+  // dead-center approach and the screen. z=-0.2 (pulled back from the
+  // original z=0.8) gives the boom camera real clearance from the entry
+  // chamber's accent wall — the original spot left only ~0.1-0.3 units,
+  // too tight for any 3rd-person distance to show the screen instead of
+  // the character's own body filling the frame.
+  { pos: [2.4, 2.2, -0.2],   lookAt: [1.2, 1.72, -3.8],      label: "Client Reviews",        tier: 2 },
   // AI Predictions Wing — south alcove branching off the gallery at z=-4, x=-3.5..-1.5 doorway.
   // Camera sits north of doorway, elevated, looking south into the alcove.
   { pos: [-2.5, 2.5, -3.5],   lookAt: [-2.5, 1.0, -7],        label: "AI Predictions Wing",   tier: 2 },
@@ -69,7 +76,11 @@ export const STOPS: GalleryStop[] = [
   { pos: [9, 1.7, GZ],       lookAt: [9, 1.7, GZ - GW],      label: "RetroRack",             tier: 2 },
   // Goat — camera pulls back, raised higher, looking down at the statue
   { pos: [8.5, 2.4, GZ + 1.2], lookAt: [10, 0.6, GZ],        label: "The Standard",          tier: 1 },
-  { pos: [10.5, 1.7, GZ],    lookAt: [10.5, 1.7, GZ + GW],   label: "RetroRack Logo",        tier: 2 },
+  // z pulled north from GZ to -0.5 — the goat statue's footprint (x:9.3..10.7,
+  // z:-2..-1) reaches almost exactly to this stop's original position, so
+  // literally every approach (including the plain adjacent step from "The
+  // Standard") clipped it. -0.5 sits outside the goat's z-range entirely.
+  { pos: [10.5, 1.7, -0.5],  lookAt: [10.5, 1.7, GZ + GW],   label: "RetroRack Logo",        tier: 2 },
   { pos: [11.5, 1.7, GZ],    lookAt: [11.5, 1.7, GZ - GW],   label: "Bottor Assist",         tier: 1 },
   // Brand
   { pos: [12.5, 1.7, GZ],    lookAt: [12.5, 1.7, GZ + GW],   label: "By Any Means",          tier: 3 },
@@ -92,10 +103,29 @@ export const STOPS: GalleryStop[] = [
   { pos: [3, 1.5, -9],        lookAt: [3, 1.3, -7.5],         label: "__vault_payments",      tier: 3 },
   { pos: [4.5, 1.5, -9],      lookAt: [4.5, 1.3, -7.5],       label: "__vault_gamedev",       tier: 3 },
   { pos: [6, 1.5, -9],        lookAt: [6, 1.3, -7.5],         label: "__vault_automation",    tier: 3 },
+  // HIDDEN — routing waypoint only (see getWaypointRoute in GalleryScene.tsx).
+  // The Entry Chamber's thin display panel (x:-0.95..0.95, z≈-1) sits almost
+  // exactly on the straight line between the near-entrance corridor stops
+  // and the AI Predictions Wing doorway. This point sits south of the
+  // panel's z-range, so routing through it first (staying east of the panel
+  // on the way down, then west to the doorway) keeps both hops clear of it.
+  { pos: [1.2, 1.8, -2],      lookAt: [1.2, 1.7, -3.5],       label: "__bypass_panel_south",  tier: 3 },
+  // HIDDEN — routing waypoints only. The goat statue (x:9.3..10.7, z:-2..-1)
+  // sits astride the corridor's spine (GZ=-1.5) — a direct jump skipping
+  // over it (e.g. Lush Brows → RetroRack Logo) cuts straight through. These
+  // sit north of it on either side, at z=0.5 (clear of its z-range
+  // entirely), so a west-stop → this → this → east-stop chain never crosses it.
+  { pos: [9, 1.8, 0.5],       lookAt: [10, 1.7, 0],           label: "__bypass_goat_west",    tier: 3 },
+  { pos: [11.5, 1.8, 0.5],    lookAt: [10, 1.7, 0],           label: "__bypass_goat_east",    tier: 3 },
 ];
 
 // Last index in STOPS — used only for clamping camera interpolation bounds.
 const LAST = STOPS.length - 1;
+
+// Safe z for the character/camera at the entrance stop (STOPS[0], z=1.5) —
+// matches GalleryScene's characterSpawn exactly (pz - 1.9) so every route
+// into this stop lands at the identical, already-confirmed-good position.
+const ENTRANCE_SAFE_Z = STOPS[0].pos[2] - 1.9;
 // Auto-tour ends at Services; anything after is only reachable via manual
 // navigation (scroll past Services, or the map).
 export const TOUR_LAST = STOPS.findIndex((s) => s.label === "Services");
@@ -104,6 +134,11 @@ export const PORTAL_STOP = TOUR_LAST + 1;
 // portal approach. Keep these constants in sync with the stops below.
 export const VAULT_CASE_START = PORTAL_STOP + 1;
 export const VAULT_CASE_COUNT = 7;
+// Routing waypoints (see getWaypointRoute in GalleryScene.tsx) — appended
+// last, in this fixed order, so they never shift the offsets above.
+export const BYPASS_PANEL_SOUTH_IDX = STOPS.length - 3;
+export const BYPASS_GOAT_WEST_IDX = STOPS.length - 2;
+export const BYPASS_GOAT_EAST_IDX = STOPS.length - 1;
 
 // Portal painting position + music-room camera for the override transition.
 // Portal is on the east end wall, right-of-book (z=0). The music room sits
@@ -663,6 +698,15 @@ interface GalleryRoomProps {
   onTributeBenchClick?: () => void;
   /** Fires when a prediction frame in the Predictions Wing is clicked. */
   onSelectPrediction?: (slug: string) => void;
+  /** "balanced" swaps the reflective floor's real-time planar reflection
+   *  (a full second scene render pass every frame — very expensive on
+   *  integrated GPUs) for a plain material. */
+  quality?: "high" | "balanced";
+  /** When set (and cameraDisabled is false), all of this component's camera
+   *  writes (STOPS lerp, portal override, direct snap) target this proxy
+   *  object instead of the real render camera — used so the third-person
+   *  character can be driven by the exact same tour/portal choreography. */
+  navTarget?: THREE.Object3D | null;
 }
 
 export default function GalleryRoom({
@@ -699,8 +743,11 @@ export default function GalleryRoom({
   onTributePortalClick,
   onTributeBenchClick,
   onSelectPrediction,
+  navTarget = null,
+  quality = "high",
 }: GalleryRoomProps) {
-  const { camera } = useThree();
+  const { camera: renderCamera } = useThree();
+  const camera = navTarget ?? renderCamera;
 
   const smoothProgress = useRef(0);
   const camPos = useRef(new THREE.Vector3(0, 1.7, 0.5));
@@ -918,6 +965,16 @@ export default function GalleryRoom({
         _v3a.x -= 1.5;
         _v3a.y += 0.4;
       }
+      // Same entry-chamber wall clearance as the main STOPS-lerp path below —
+      // map jumps of more than 1 stop take this direct A→B path instead, so
+      // without this the character lands right up against the front wall
+      // whenever the destination is the entrance stop, regardless of which
+      // path got it there. Matches characterSpawn's exact z (GalleryScene.tsx)
+      // so every route to this stop lands at the same, already-confirmed-good
+      // position instead of each path independently approximating "far enough."
+      if (navTarget && Math.abs(_v3a.x) < 1 && _v3a.z > ENTRANCE_SAFE_Z) {
+        _v3a.z = ENTRANCE_SAFE_Z;
+      }
       const rate = 4.5;
       const k = 1 - Math.exp(-rate * dt);
       directSmoothPos.current.lerp(_v3a, k);
@@ -978,6 +1035,20 @@ export default function GalleryRoom({
 
     // Camera position
     getCamera(smoothProgress.current, camPos.current, camLook.current);
+
+    // When driving the character proxy (not the real camera), pull the
+    // target back from the entry chamber's back wall — STOPS[0] sits at
+    // z=1.5, only 0.5 units from the wall (z=2), which is fine for the
+    // first-person eye camera but embeds the 3rd-person boom (~1.4 units
+    // behind the character) inside the wall, reading as a black screen.
+    // Scoped tightly to the entrance doorway's x range so no other stop's
+    // framing is affected. Matches GalleryScene's characterSpawn exactly, so
+    // every route to this stop (initial spawn, this path, the direct-snap
+    // path above) lands at the identical, already-confirmed-good position.
+    if (navTarget && Math.abs(camPos.current.x) < 1 && camPos.current.z > ENTRANCE_SAFE_Z) {
+      camPos.current.z = ENTRANCE_SAFE_Z;
+    }
+
     camera.position.copy(camPos.current);
 
     // Mobile framing adjustment for Services — blend a pull-back + rise as the
@@ -1031,20 +1102,24 @@ export default function GalleryRoom({
           Shrunk from the old 35×15 plane to prevent Z-fighting with Gallery II floor. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[9.5, 0, GZ]} receiveShadow>
         <planeGeometry args={[19, GW * 2]} />
-        <MeshReflectorMaterial
-          map={floorTex}
-          color="#908478"
-          roughness={0.65}
-          metalness={0.3}
-          mirror={0.35}
-          blur={[400, 150]}
-          resolution={512}
-          mixBlur={0.9}
-          mixStrength={1.2}
-          depthScale={1.0}
-          minDepthThreshold={0.4}
-          maxDepthThreshold={1.4}
-        />
+        {quality === "high" ? (
+          <MeshReflectorMaterial
+            map={floorTex}
+            color="#908478"
+            roughness={0.65}
+            metalness={0.3}
+            mirror={0.35}
+            blur={[400, 150]}
+            resolution={512}
+            mixBlur={0.9}
+            mixStrength={1.2}
+            depthScale={1.0}
+            minDepthThreshold={0.4}
+            maxDepthThreshold={1.4}
+          />
+        ) : (
+          <meshStandardMaterial map={floorTex} color="#908478" roughness={0.65} metalness={0.3} />
+        )}
       </mesh>
       {/* Entry chamber floor — only the front lobby strip z=+1..+2.
           The corridor floors (Main Gallery + Gallery II) already cover z=-4..+1. */}
@@ -1266,9 +1341,10 @@ export default function GalleryRoom({
       })}
 
       {/* Hidden letters for the Founder's Study scavenger hunt — removed
-          once collected. Skipped entirely once the study is already unlocked. */}
-      {!cameraDisabled &&
-        hiddenLetters.map((l) => (
+          once collected. Skipped entirely once the study is already unlocked.
+          Not gated on cameraDisabled/scriptedNavActive: the hunt is meant to
+          be found during free-roam exploration, not just the guided tour. */}
+      {hiddenLetters.map((l) => (
           <HiddenLetter
             key={l.char}
             char={l.char}

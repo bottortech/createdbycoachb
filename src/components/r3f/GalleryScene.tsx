@@ -4,7 +4,7 @@ import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
+import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, BYPASS_PANEL_SOUTH_IDX, BYPASS_GOAT_WEST_IDX, BYPASS_GOAT_EAST_IDX, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
 import { SPOTIFY_SRC, TV_LEFT_YT, TV_RIGHT_YT, APPLE_URL } from "./MusicRoom";
 import { STUDY_ROOM_CAMERA, STUDY_PIECES, STUDY_DEFAULT_PIECE_IDX, STUDY_BOOK_TITLES } from "./FoundersStudy";
 import {
@@ -23,6 +23,10 @@ import GalleryOverlayPanel from "./GalleryOverlayPanel";
 import GalleryMap from "./GalleryMap";
 import TechVaultMap from "./TechVaultMap";
 import TestimonialProjector from "../sections/TestimonialProjector";
+import CharacterController, { CharacterOutState } from "./CharacterController";
+import ThirdPersonCamera from "./ThirdPersonCamera";
+import MobileControls from "./MobileControls";
+import FPSMeter from "./FPSMeter";
 
 type PanelType = "enterprise" | "studio" | "appointments" | "commission" | "connect" | "testimonials" | null;
 
@@ -82,16 +86,13 @@ const MUSIC_ROOM_PIECES: ReadonlyArray<{
   { name: "Album IV",    lookAt: [31.5, 1.7, 5.98] },
 ];
 
-// Guided tour dwell — how long to sit at each stop AFTER the camera has fully
-// settled. Anchor stops get a longer beat; regular tier-based stops scale.
-// Tech Vault doorway is a pass-through waypoint in guided mode (the tour flies
-// straight into the vault cases from there), so it gets the shortest dwell.
+// Guided tour dwell — how long to sit at each stop AFTER the camera has
+// fully settled. Flat 3s at every real content stop. Tech Vault doorway is
+// a pass-through waypoint in guided mode (the tour flies straight into the
+// vault cases from there, not a piece to look at), so it's exempt.
 function guidedDwellMs(stop: (typeof STOPS)[number]): number {
-  if (stop.label === "WiggleWoo's Word Quest") return 2600;
-  if (stop.label === "The Standard") return 2500;
-  if (stop.label === "Services") return 2000;
   if (stop.label === "Tech Vault") return 150;
-  return stop.tier === 1 ? 1750 : stop.tier === 2 ? 2000 : 1500;
+  return 3000;
 }
 
 export default function GalleryScene() {
@@ -304,7 +305,84 @@ export default function GalleryScene() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const portalReturnStop = useRef<number>(PORTAL_STOP);
   const snapRef = useRef(false);
-  const anyOverlayOpen = !!selectedProject || !!selectedPrediction || !!activePanel;
+  const anyOverlayOpen = !!selectedProject || !!selectedPrediction || !!activePanel || mapOpen;
+
+  // --- Third-person character -------------------------------------------
+  // Proxy object: whenever a scripted move (guided tour / next-prev / map
+  // jump / entrance) is in flight, GalleryRoom's existing STOPS/camera math
+  // writes into this instead of the real camera, and CharacterController
+  // walks the character toward it. During portals, GalleryRoom writes to the
+  // real camera directly (navTarget omitted) — portal rooms are untouched.
+  const navProxy = useMemo(() => new THREE.Object3D(), []);
+  const characterStateRef = useRef<CharacterOutState>({ position: new THREE.Vector3(0, 0, 1.5), yaw: 0 });
+  const joystickInputRef = useRef({ forward: 0, turn: 0 });
+
+  // Pre-entry, GalleryRoom must keep driving the real camera (today's static
+  // establishing shot) rather than the character proxy — same for portals.
+  const useRealCameraDirectly = !entered || portalActive;
+  const scriptedNavActive = useRealCameraDirectly || autoTour || snapRef.current || !!directSnap;
+  const characterControlMode: "free" | "scripted" = scriptedNavActive ? "scripted" : "free";
+  const galleryRoomCameraDisabled = !scriptedNavActive;
+  const showCharacter = entered && !portalActive;
+
+  // STOPS[0] ("WiggleWoo's Word Quest") sits at z=1.5, only 0.5 units from the
+  // entry chamber's back wall (z=2) — fine for a first-person eye position,
+  // but a 3rd-person camera pulled back behind the character at that spot
+  // ends up embedded in/behind that wall (the Phase 3 "flat brown screen"
+  // bug). Nudge the spawn deeper into the room so the follow camera has
+  // clearance. Same x/yaw as STOPS[0], so the initial framing is still close
+  // to the original entrance view.
+  const characterSpawn = useMemo(() => {
+    const [px, , pz] = STOPS[0].pos;
+    const [lx, , lz] = STOPS[0].lookAt;
+    const yaw = Math.atan2(-(lx - px), -(lz - pz));
+    return { position: [px, 0, pz - 1.9] as [number, number, number], yaw };
+  }, []);
+
+  // Known-open fallback for the debug "Reset View" button — the main gallery
+  // hall (STOPS[1]) has no nearby walls in any direction.
+  const RESET_VIEW_SPAWN = useMemo(() => {
+    const stop = STOPS.find((s) => s.label === "Main Gallery") ?? STOPS[1];
+    const [px, , pz] = stop.pos;
+    const [lx, , lz] = stop.lookAt;
+    const yaw = Math.atan2(-(lx - px), -(lz - pz));
+    return { position: [px, 0, pz] as [number, number, number], yaw };
+  }, []);
+
+  // Dev-only diagnostics — gated on NODE_ENV below so this never renders (or
+  // ships) in production, but stays available locally via `npm run dev`.
+  const [resetSignal, setResetSignal] = useState(0);
+  const cameraDebugRef = useRef<{ camPos: THREE.Vector3; camLook: THREE.Vector3 }>({
+    camPos: new THREE.Vector3(),
+    camLook: new THREE.Vector3(),
+  });
+  const fpsRef = useRef(0);
+  const [quality, setQuality] = useState<"high" | "balanced">("high");
+  // Counts how many times controlMode has actually transitioned since mount —
+  // stays at 1 if it settles into "free" and never flickers back to "scripted".
+  const modeChangeCountRef = useRef(0);
+  useEffect(() => {
+    modeChangeCountRef.current += 1;
+  }, [characterControlMode]);
+
+  const [debugHudText, setDebugHudText] = useState("");
+  useEffect(() => {
+    // 2x/sec — enough to read live, far below the 60fps hot path (and this
+    // is the only state update this diagnostics panel causes).
+    const id = setInterval(() => {
+      const c = characterStateRef.current;
+      const cam = cameraDebugRef.current;
+      setDebugHudText(
+        `FPS: ${fpsRef.current.toFixed(0)}   QUALITY: ${quality.toUpperCase()}\n` +
+          `MODE: ${characterControlMode.toUpperCase()}  (changed ${modeChangeCountRef.current}x)\n` +
+          `char pos: ${c.position.x.toFixed(2)}, ${c.position.y.toFixed(2)}, ${c.position.z.toFixed(2)}  yaw: ${c.yaw.toFixed(2)}\n` +
+          `cam pos:  ${cam.camPos.x.toFixed(2)}, ${cam.camPos.y.toFixed(2)}, ${cam.camPos.z.toFixed(2)}\n` +
+          `navProxy: ${navProxy.position.x.toFixed(2)}, ${navProxy.position.y.toFixed(2)}, ${navProxy.position.z.toFixed(2)}\n` +
+          `showCharacter: ${showCharacter}  autoTour: ${autoTour}  snapping: ${snapRef.current}`
+      );
+    }, 500);
+    return () => clearInterval(id);
+  }, [navProxy, characterControlMode, showCharacter, autoTour, quality]);
 
   // Sync ref with state (ref for non-render reads, state for passing to Canvas).
   // Clamp to the full STOPS range so the map can directly address hidden stops
@@ -379,20 +457,131 @@ export default function GalleryScene() {
     []
   );
 
+  // --- Doorway-aware routing for direct-snap jumps ---------------------
+  // A raw direct-snap draws one straight line between two arbitrary points,
+  // which is safe within the open corridor (Entry Chamber + Main Gallery +
+  // Gallery II are all one continuous space) but cuts through a solid wall
+  // whenever the jump crosses into/out of one of the two side rooms — e.g. a
+  // straight line from "The Authenticity Shift" (deep in the Predictions
+  // Wing alcove) to "Tech Vault" crosses the Main Gallery's south wall well
+  // outside the doorway gap. Each side room's doorway threshold is already a
+  // real STOPS entry, so routing a cross-zone jump through that stop first
+  // (as its own direct-snap hop) keeps every hop a straight line that stays
+  // inside a doorway gap or the open corridor — verified by hand against the
+  // actual wall/doorway coordinates for every zone pairing below.
+  const PREDICTIONS_DOORWAY_IDX = 3; // "AI Predictions Wing" — sits at the x:-3.5..-1.5 doorway
+  const TECH_VAULT_DOORWAY_IDX = 6; // "Tech Vault" — sits at the x:3..5 doorway
+  const PREDICTIONS_ZONE_INDICES = new Set([3, 4]); // AI Predictions Wing, The Authenticity Shift
+
+  const zoneOf = useCallback(
+    (idx: number): "predictions" | "techvault" | "corridor" => {
+      if (PREDICTIONS_ZONE_INDICES.has(idx)) return "predictions";
+      if (idx === TECH_VAULT_DOORWAY_IDX || idx >= VAULT_CASE_START) return "techvault";
+      return "corridor";
+    },
+    []
+  );
+
+  const doorwayIdxOf = useCallback(
+    (zone: "predictions" | "techvault") => (zone === "predictions" ? PREDICTIONS_DOORWAY_IDX : TECH_VAULT_DOORWAY_IDX),
+    []
+  );
+
+  // Stops on either side of the goat statue (x:9.3..10.7 astride the
+  // corridor's spine) — a skip-jump directly between them (e.g. Lush Brows
+  // -> RetroRack Logo) cuts straight through it despite both being in the
+  // open "corridor" zone. "The Standard" (the goat's own viewing stop,
+  // idx 11) is deliberately excluded — that's the intended close-up stop.
+  const GOAT_WEST_INDICES = new Set([7, 8, 9, 10]); // Carla's Creation, JB TV, Lush Brows, RetroRack
+  const GOAT_EAST_INDICES = new Set([12, 13, 14, 15, 16, 17, 18]); // RetroRack Logo .. Services
+
+  // Returns the sequence of intermediate stop indices to hop through before
+  // finally reaching toIdx — empty when a direct line between them doesn't
+  // cross anything.
+  //
+  // Any corridor↔predictions crossing routes through BYPASS_PANEL_SOUTH_IDX
+  // first: the corridor-side stops near the entrance and the Predictions
+  // Wing doorway sit almost exactly on opposite sides of the Entry
+  // Chamber's thin display panel, so even this zone's own doorway waypoint
+  // doesn't help — verified by hand (line-segment vs the panel's AABB) for
+  // every corridor stop realistically routed through here.
+  const getWaypointRoute = useCallback(
+    (fromIdx: number, toIdx: number): number[] => {
+      const waypoints: number[] = [];
+      const pushUnique = (idx: number) => {
+        if (waypoints[waypoints.length - 1] !== idx) waypoints.push(idx);
+      };
+
+      if (GOAT_WEST_INDICES.has(fromIdx) && GOAT_EAST_INDICES.has(toIdx)) {
+        pushUnique(BYPASS_GOAT_WEST_IDX);
+        pushUnique(BYPASS_GOAT_EAST_IDX);
+      } else if (GOAT_EAST_INDICES.has(fromIdx) && GOAT_WEST_INDICES.has(toIdx)) {
+        pushUnique(BYPASS_GOAT_EAST_IDX);
+        pushUnique(BYPASS_GOAT_WEST_IDX);
+      }
+
+      const fromZone = zoneOf(fromIdx);
+      const toZone = zoneOf(toIdx);
+      if (fromZone !== toZone) {
+        if (fromZone === "corridor" && toZone === "predictions") pushUnique(BYPASS_PANEL_SOUTH_IDX);
+        if (fromZone !== "corridor" && fromIdx !== doorwayIdxOf(fromZone)) pushUnique(doorwayIdxOf(fromZone));
+        if (fromZone === "predictions" && toZone === "corridor") pushUnique(BYPASS_PANEL_SOUTH_IDX);
+        if (toZone !== "corridor" && toIdx !== doorwayIdxOf(toZone)) pushUnique(doorwayIdxOf(toZone));
+      }
+      return waypoints;
+    },
+    [zoneOf, doorwayIdxOf]
+  );
+
+  // Queue of remaining hops (intermediate waypoints + the final destination)
+  // for an in-flight doorway-routed jump. Consumed one at a time by
+  // handleDirectSnapDone below.
+  const pendingWaypoints = useRef<number[]>([]);
+
   // Shared navigation — the single, reusable "move the camera to stop N"
   // function. Both manual map clicks and the guided state machine call this;
   // neither has its own movement path. Mode changes are the caller's job.
   const goToStop = useCallback((index: number) => {
+    // Cancel any in-flight direct-snap/routed jump — GalleryRoom's useFrame
+    // checks directSnap before the STOPS-lerp branch, so a stale non-null
+    // value here would keep controlling the camera (finishing the OLD
+    // request) and silently ignore this new one until it happened to arrive.
+    setDirectSnap(null);
+    pendingWaypoints.current = [];
     updateTarget(index);
     snapRef.current = true;
   }, [updateTarget]);
 
   // Same as goToStop, but picks the direct A→B lerp path when the jump would
   // cause a detour through unrelated STOPS-axis positions. Used by both manual
-  // vault clicks and the guided state machine.
+  // vault clicks and the guided state machine. Cross-zone jumps (corridor ↔
+  // Predictions Wing ↔ Tech Vault) get routed through the relevant doorway
+  // stop(s) first — see getWaypointRoute — instead of a single unrouted
+  // direct-snap that can cut through a wall.
   const navigateToStop = useCallback((destIdx: number) => {
     const currentIdx = Math.round(targetRef.current);
-    if (transitionNeedsDirectSnap(currentIdx, destIdx)) {
+    // Already there, or already mid-transition heading there — do nothing.
+    // targetRef reflects the DESTINATION of any in-flight jump, not our
+    // actual current position, so treating a repeat click on that same
+    // destination as a fresh "currentIdx === destIdx, same zone, no routing
+    // needed" request was silently discarding whatever routed multi-hop
+    // path was already correctly carrying us there and falling back to a
+    // raw, unrouted jump instead — worse than doing nothing.
+    if (currentIdx === destIdx && (directSnap || pendingWaypoints.current.length > 0 || snapRef.current)) {
+      return;
+    }
+    // Invalidate any queued hops from an interrupted previous routed jump —
+    // this new request fully supersedes it.
+    pendingWaypoints.current = [];
+    const waypoints = getWaypointRoute(currentIdx, destIdx);
+    if (waypoints.length > 0) {
+      updateTarget(destIdx);
+      snapRef.current = false;
+      pendingWaypoints.current = [...waypoints, destIdx];
+      const firstIdx = pendingWaypoints.current.shift()!;
+      const first = STOPS[firstIdx];
+      setDirectSnap({ pos: first.pos, lookAt: first.lookAt, targetIdx: firstIdx });
+    } else if (transitionNeedsDirectSnap(currentIdx, destIdx)) {
       const dest = STOPS[destIdx];
       updateTarget(destIdx);
       snapRef.current = false;
@@ -400,7 +589,7 @@ export default function GalleryScene() {
     } else {
       goToStop(destIdx);
     }
-  }, [goToStop, updateTarget, transitionNeedsDirectSnap]);
+  }, [goToStop, updateTarget, transitionNeedsDirectSnap, getWaypointRoute, directSnap]);
 
   // Handle map piece selection
   const handleMapSelect = useCallback((stopIndex: number) => {
@@ -435,10 +624,46 @@ export default function GalleryScene() {
   }, [consumeSettleHandler]);
 
   // Fires when GalleryRoom finishes a direct A→B lerp (vault entry/exit/hop).
+  // If a doorway-routed jump (see navigateToStop/getWaypointRoute) left more
+  // hops queued, advance to the next one instead of finishing — the guided
+  // tour's settle-handler (vault enter/skip prompt) must only fire once, on
+  // true final arrival, not after every intermediate doorway hop.
+  //
+  // This event fires when the camera PROXY (navProxy) reaches the waypoint —
+  // not the character. The character chases the proxy with its own separate
+  // lag (CharacterController), so advancing to the next waypoint immediately
+  // let the proxy race through an entire multi-hop route before the
+  // character's lagged chase visually reached even the first one — the
+  // character then just cut a straight line toward wherever the proxy ended
+  // up, defeating the whole point of routing around an obstacle (this was
+  // the actual cause of the goat-statue clipping and the "needs repeat
+  // clicks" feel, since the nav state said "arrived" while the character
+  // was visibly still catching up). Waiting here for the character to get
+  // reasonably close to the waypoint it just reached — not just the proxy —
+  // keeps the character's real path tracing the intended route.
   const handleDirectSnapDone = useCallback(() => {
+    if (pendingWaypoints.current.length > 0) {
+      const nextIdx = pendingWaypoints.current.shift()!;
+      const next = STOPS[nextIdx];
+      const arrivedAt = navProxy.position.clone();
+      const advance = () => setDirectSnap({ pos: next.pos, lookAt: next.lookAt, targetIdx: nextIdx });
+      const CATCH_UP_DIST = 0.5;
+      const CATCH_UP_TIMEOUT_MS = 2000; // safety net — never block the chain forever
+      const startedAt = Date.now();
+      const checkCaughtUp = () => {
+        const closeEnough = characterStateRef.current.position.distanceTo(arrivedAt) < CATCH_UP_DIST;
+        if (closeEnough || Date.now() - startedAt > CATCH_UP_TIMEOUT_MS) {
+          advance();
+        } else {
+          setTimeout(checkCaughtUp, 80);
+        }
+      };
+      checkCaughtUp();
+      return;
+    }
     setDirectSnap(null);
     consumeSettleHandler();
-  }, [consumeSettleHandler]);
+  }, [consumeSettleHandler, navProxy]);
 
   useEffect(() => {
     const guidedActive = entered && autoTour && !anyOverlayOpen && !portalActive;
@@ -839,20 +1064,6 @@ export default function GalleryScene() {
     return () => clearTimeout(t);
   }, [entered, handleEnter]);
 
-  // Scroll: accumulate and advance by fractions
-  useEffect(() => {
-    const onWheel = (e: WheelEvent) => {
-      if (anyOverlayOpen || !entered || portalActive) return;
-      e.preventDefault();
-      setAutoTour(false);
-      // Smooth scroll: small increments
-      const delta = e.deltaY * 0.003;
-      updateTarget(targetRef.current + delta);
-    };
-    window.addEventListener("wheel", onWheel, { passive: false });
-    return () => window.removeEventListener("wheel", onWheel);
-  }, [anyOverlayOpen, entered, updateTarget, portalActive, setAutoTour]);
-
   // Arrow keys: jump to next/prev stop (with press-and-hold repeat)
   useEffect(() => {
     let holdInterval: ReturnType<typeof setInterval> | null = null;
@@ -905,22 +1116,6 @@ export default function GalleryScene() {
     return () => { window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp); clearHold(); };
   }, [anyOverlayOpen, entered, updateTarget, setAutoTour, portalActive, portalStage, portalReady, handlePortalExit, handlePortalEnter]);
 
-  // Touch/swipe
-  useEffect(() => {
-    let startY = 0;
-    const onStart = (e: TouchEvent) => { startY = e.touches[0].clientY; };
-    const onMove = (e: TouchEvent) => {
-      if (anyOverlayOpen || !entered || portalActive) return;
-      setAutoTour(false);
-      const dy = startY - e.touches[0].clientY;
-      startY = e.touches[0].clientY;
-      updateTarget(targetRef.current + dy * 0.005);
-    };
-    window.addEventListener("touchstart", onStart, { passive: true });
-    window.addEventListener("touchmove", onMove, { passive: true });
-    return () => { window.removeEventListener("touchstart", onStart); window.removeEventListener("touchmove", onMove); };
-  }, [anyOverlayOpen, entered, updateTarget, portalActive, setAutoTour]);
-
   // Prev/next button handlers — snap to exact stops
   const goNext = useCallback(() => {
     setAutoTour(false);
@@ -959,9 +1154,9 @@ export default function GalleryScene() {
   return (
     <div className="fixed inset-0">
       <Canvas
-        shadows
-        dpr={[1, 1.5]}
-        camera={{ fov: 55, near: 0.1, far: 100, position: [0, 1.7, 1.5] }}
+        shadows={quality === "high"}
+        dpr={quality === "high" ? [1, 1.5] : [1, 1]}
+        camera={{ fov: isMobile ? 78 : 55, near: 0.1, far: 100, position: [0, 1.7, 1.5] }}
         gl={{ antialias: false, alpha: false, powerPreference: "default", toneMapping: THREE.LinearToneMapping, toneMappingExposure: 1.6 }}
         style={{ background: "#050403" }}
         onPointerMissed={() => {
@@ -970,12 +1165,14 @@ export default function GalleryScene() {
       >
         <Suspense fallback={null}>
           <GalleryRoom
+            quality={quality}
             onSelectProject={setSelectedProject}
             modalOpen={anyOverlayOpen}
             targetProgress={target}
             targetRef={targetRef}
             autoTour={autoTour && entered && !anyOverlayOpen && !portalActive}
-            cameraDisabled={false}
+            cameraDisabled={galleryRoomCameraDisabled}
+            navTarget={useRealCameraDirectly ? undefined : navProxy}
             snapping={snapRef.current}
             onSnapDone={handleSnapDone}
             onProgressChange={setProgress}
@@ -1008,8 +1205,76 @@ export default function GalleryScene() {
           />
         </Suspense>
 
-
+        <Suspense fallback={null}>
+          <CharacterController
+            active={showCharacter}
+            controlMode={characterControlMode}
+            navTarget={useRealCameraDirectly ? null : navProxy}
+            joystickInputRef={joystickInputRef}
+            spawn={characterSpawn}
+            outState={characterStateRef}
+            resetSignal={resetSignal}
+            resetTo={RESET_VIEW_SPAWN}
+          />
+        </Suspense>
+        <ThirdPersonCamera
+          active={showCharacter}
+          characterState={characterStateRef}
+          resetSignal={resetSignal}
+          debugState={cameraDebugRef}
+        />
+        <FPSMeter fpsRef={fpsRef} />
       </Canvas>
+
+      {isMobile && entered && showCharacter && !anyOverlayOpen && (
+        <MobileControls inputRef={joystickInputRef} />
+      )}
+
+      {/* Dev-only diagnostics — gated on NODE_ENV so it's never in the production
+          build real visitors get, but stays available locally via `npm run dev`.
+          Mobile gets a small tap-to-cycle-quality badge instead of the full panel — the full
+          panel is sized for desktop and was covering the real nav buttons + joystick on phones. */}
+      {process.env.NODE_ENV === "development" && entered && isMobile && (
+        <button
+          onClick={() => setQuality((q) => (q === "high" ? "balanced" : "high"))}
+          className="fixed top-16 right-2 z-[200] whitespace-pre rounded bg-black/80 px-2 py-1 text-left font-mono text-[10px] text-lime-300"
+        >
+          {`FPS: ${fpsRef.current.toFixed(0)} · ${quality === "high" ? "High" : "Balanced"} (tap)\nchar: ${characterStateRef.current.position.x.toFixed(2)}, ${characterStateRef.current.position.z.toFixed(2)}  yaw: ${characterStateRef.current.yaw.toFixed(2)}\ntarget: ${targetRef.current.toFixed(2)}`}
+        </button>
+      )}
+      {process.env.NODE_ENV === "development" && entered && !isMobile && (
+        <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 rounded-lg bg-black/80 p-3 font-mono text-[10px] leading-relaxed text-lime-300 whitespace-pre">
+          {debugHudText}
+          <div className="mt-1 flex gap-1">
+            <button
+              onClick={goPrev}
+              className="flex-1 rounded bg-sky-500/20 px-2 py-1 text-[10px] uppercase tracking-wider text-sky-200 hover:bg-sky-500/30"
+            >
+              ◀ Prev Stop
+            </button>
+            <button
+              onClick={goNext}
+              className="flex-1 rounded bg-sky-500/20 px-2 py-1 text-[10px] uppercase tracking-wider text-sky-200 hover:bg-sky-500/30"
+            >
+              Next Stop ▶
+            </button>
+          </div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setResetSignal((n) => n + 1)}
+              className="flex-1 rounded bg-lime-500/20 px-2 py-1 text-[10px] uppercase tracking-wider text-lime-200 hover:bg-lime-500/30"
+            >
+              Reset View
+            </button>
+            <button
+              onClick={() => setQuality((q) => (q === "high" ? "balanced" : "high"))}
+              className="flex-1 rounded bg-amber-500/20 px-2 py-1 text-[10px] uppercase tracking-wider text-amber-200 hover:bg-amber-500/30"
+            >
+              Quality: {quality === "high" ? "High" : "Balanced"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Intro */}
       <AnimatePresence>
@@ -1078,7 +1343,7 @@ export default function GalleryScene() {
                 : <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M16.5 12A4.5 4.5 0 0014 8.14v2.12l2.45 2.45c.03-.2.05-.4.05-.71zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.92 8.92 0 0021 12a9 9 0 00-7-8.77v2.06A6.97 6.97 0 0121 12zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 003.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" /></svg>}
               </button>
               {AUTO_TOUR_ENABLED && (
-                <button onClick={() => { const next = mode === "guided" ? "manual" : "guided"; setMode(next); if (next === "manual") setMapOpen(true); }} className={`rounded-full px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.12em] transition-all border ${mode === "guided" ? "border-gallery-accent/40 text-gallery-accent bg-gallery-accent/10" : "border-white/20 text-gallery-light bg-white/5"}`}>{mode === "guided" ? "Guided" : "Manual"}</button>
+                <button onClick={() => { const next = mode === "guided" ? "manual" : "guided"; setMode(next); if (next === "manual") setMapOpen(true); else setMapOpen(false); }} className={`rounded-full px-2.5 py-1 text-[9px] font-medium uppercase tracking-[0.12em] transition-all border ${mode === "guided" ? "border-gallery-accent/40 text-gallery-accent bg-gallery-accent/10" : "border-white/20 text-gallery-light bg-white/5"}`}>{mode === "guided" ? "Guided" : "Manual"}</button>
               )}
             </div>
           </div>
@@ -2036,7 +2301,7 @@ export default function GalleryScene() {
           open={mapOpen}
           onClose={() => setMapOpen(false)}
           onSelectStop={handleMapSelect}
-          onContinueTour={() => { setMode("guided"); }}
+          onContinueTour={() => { setMode("guided"); setMapOpen(false); }}
           currentLabel={currentLabel}
           showContinueTour={AUTO_TOUR_ENABLED}
         />
