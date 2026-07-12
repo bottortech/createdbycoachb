@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useFBX } from "@react-three/drei";
 import * as THREE from "three";
 
-const CHARACTER_PATH = "/character+movement/Ch28_nonPBR.fbx";
+const CHARACTER_PATH = "/character-movement/character-base.fbx";
 
 // The source FBX embeds its Diffuse/Normal/Specular/Glossiness maps at
 // 4096x4096 each (Mixamo's default export) — ~250MB+ of GPU memory for a

@@ -8,11 +8,11 @@ import CharacterModel from "./CharacterModel";
 export type MovementState = "idle" | "walk" | "walkBack" | "turnLeft" | "turnRight";
 
 const CLIP_PATHS: Record<MovementState, string> = {
-  idle: "/character+movement/Breathing Idle.fbx",
-  walk: "/character+movement/Walking.fbx",
-  walkBack: "/character+movement/Walking Backwards.fbx",
-  turnLeft: "/character+movement/Left Turn.fbx",
-  turnRight: "/character+movement/Right Turn.fbx",
+  idle: "/character-movement/breathing-idle.fbx",
+  walk: "/character-movement/walking.fbx",
+  walkBack: "/character-movement/walking-backwards.fbx",
+  turnLeft: "/character-movement/left-turn.fbx",
+  turnRight: "/character-movement/right-turn.fbx",
 };
 
 // Basic crossfade for now — Phase 4 is where blend quality gets tuned further.
