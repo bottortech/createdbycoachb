@@ -64,6 +64,15 @@ interface CharacterControllerProps {
   resetSignal?: number;
   /** Where "Reset View" places the character — should be a known-open spot. */
   resetTo?: { position: [number, number, number]; yaw: number };
+  /**
+   * Mutated directly (no re-render) by GalleryScene whenever a scripted
+   * transition needs the character to be authoritatively AT a specific
+   * waypoint/destination right now, instead of trusting the exponential
+   * chase to have visually caught up to navTarget by some deadline. Bump
+   * `.signal` and set `.position`/`.yaw` in the same write; checked once
+   * per frame here and applied instantly the frame after it changes.
+   */
+  snapTargetRef?: RefObject<{ signal: number; position: [number, number, number]; yaw: number }>;
 }
 
 export default function CharacterController({
@@ -75,6 +84,7 @@ export default function CharacterController({
   outState,
   resetSignal = 0,
   resetTo,
+  snapTargetRef,
 }: CharacterControllerProps) {
   const group = useRef<THREE.Group>(null);
   const animRef = useRef<AnimationControllerHandle>(null);
@@ -88,6 +98,7 @@ export default function CharacterController({
   const turnVelocity = useRef(0);
   const initialized = useRef(false);
   const lastResetSignal = useRef(resetSignal);
+  const lastSnapSignal = useRef(0);
   const lastLog = useRef(0);
 
   const keys = useRef<Record<"w" | "a" | "s" | "d", boolean>>({ w: false, a: false, s: false, d: false });
@@ -144,6 +155,13 @@ export default function CharacterController({
       const target = resetTo ?? spawn;
       position.current.set(...target.position);
       yaw.current = target.yaw;
+    }
+
+    const snapTarget = snapTargetRef?.current;
+    if (snapTarget && snapTarget.signal !== lastSnapSignal.current) {
+      lastSnapSignal.current = snapTarget.signal;
+      position.current.set(...snapTarget.position);
+      yaw.current = snapTarget.yaw;
     }
 
     if (!active) return;

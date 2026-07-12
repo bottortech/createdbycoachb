@@ -104,12 +104,17 @@ export const STOPS: GalleryStop[] = [
   { pos: [4.5, 1.5, -9],      lookAt: [4.5, 1.3, -7.5],       label: "__vault_gamedev",       tier: 3 },
   { pos: [6, 1.5, -9],        lookAt: [6, 1.3, -7.5],         label: "__vault_automation",    tier: 3 },
   // HIDDEN — routing waypoint only (see getWaypointRoute in GalleryScene.tsx).
-  // The Entry Chamber's thin display panel (x:-0.95..0.95, z≈-1) sits almost
-  // exactly on the straight line between the near-entrance corridor stops
-  // and the AI Predictions Wing doorway. This point sits south of the
-  // panel's z-range, so routing through it first (staying east of the panel
-  // on the way down, then west to the doorway) keeps both hops clear of it.
-  { pos: [1.2, 1.8, -2],      lookAt: [1.2, 1.7, -3.5],       label: "__bypass_panel_south",  tier: 3 },
+  // The Entry Chamber's thin display panel (x:-0.95..0.95, z≈-1) sits between
+  // the near-entrance corridor stops and the AI Predictions Wing doorway
+  // (which is west, x=-2.5). A straight line from the entrance area technically
+  // clears the panel's edge, but only by a sliver — too tight for the
+  // character's own width, reading as clipping through the wall. This point
+  // sits west of the panel (clear of it with real margin) and south of its
+  // z-range, on the actual line toward the doorway, so routing through it
+  // first keeps the character visibly walking around the wall instead of
+  // grazing past it — and since it's the same side the destination is
+  // already on, this adds no detour.
+  { pos: [-3, 1.8, -2],       lookAt: [-2.5, 1.7, -3.5],      label: "__bypass_panel_west",   tier: 3 },
   // HIDDEN — routing waypoints only. The goat statue (x:9.3..10.7, z:-2..-1)
   // sits astride the corridor's spine (GZ=-1.5) — a direct jump skipping
   // over it (e.g. Lush Brows → RetroRack Logo) cuts straight through. These
@@ -136,7 +141,7 @@ export const VAULT_CASE_START = PORTAL_STOP + 1;
 export const VAULT_CASE_COUNT = 7;
 // Routing waypoints (see getWaypointRoute in GalleryScene.tsx) — appended
 // last, in this fixed order, so they never shift the offsets above.
-export const BYPASS_PANEL_SOUTH_IDX = STOPS.length - 3;
+export const BYPASS_PANEL_WEST_IDX = STOPS.length - 3;
 export const BYPASS_GOAT_WEST_IDX = STOPS.length - 2;
 export const BYPASS_GOAT_EAST_IDX = STOPS.length - 1;
 
@@ -778,6 +783,19 @@ export default function GalleryRoom({
   const directSmoothPos = useRef(new THREE.Vector3());
   const directSmoothLook = useRef(new THREE.Vector3());
   const directInitialized = useRef(false);
+  // Tracks which directSnap object instance onDirectSnapDone has already
+  // fired for. GalleryScene's setDirectSnap is a React state update, so a
+  // new target isn't visible to this closure until the next render commits
+  // — but this useFrame loop keeps running every rAF tick in the meantime.
+  // Once "arrived" at the old target, directInitialized resets and the very
+  // next tick re-seeds the lerp from the (already-there) camera position
+  // toward the SAME stale directSnap.pos, which reads as "arrived" again
+  // instantly — firing the callback repeatedly for one real arrival. For a
+  // caller that advances a queue synchronously on each call (as
+  // handleDirectSnapDone's waypoint chain does), that drains multiple
+  // waypoints in a single burst before React ever paints an intermediate
+  // frame. Firing at most once per distinct directSnap object closes that.
+  const directSnapFiredFor = useRef<typeof directSnap>(null);
 
   // Portal proximity — computed each frame, reported up when it crosses the threshold
   const portalPaintingVec = useRef(new THREE.Vector3(...PORTAL_PAINTING_POS));
@@ -988,7 +1006,10 @@ export default function GalleryRoom({
         smoothProgress.current = directSnap.targetIdx;
         smoothLook.current = directSnap.targetIdx;
         directInitialized.current = false;
-        onDirectSnapDone?.();
+        if (directSnapFiredFor.current !== directSnap) {
+          directSnapFiredFor.current = directSnap;
+          onDirectSnapDone?.();
+        }
       }
       onProgressChange(Math.min(1, directSnap.targetIdx / TOUR_LAST));
       onLabelChange(STOPS[directSnap.targetIdx]?.label ?? "");

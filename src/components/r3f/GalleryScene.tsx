@@ -4,7 +4,7 @@ import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, BYPASS_PANEL_SOUTH_IDX, BYPASS_GOAT_WEST_IDX, BYPASS_GOAT_EAST_IDX, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
+import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, BYPASS_PANEL_WEST_IDX, BYPASS_GOAT_WEST_IDX, BYPASS_GOAT_EAST_IDX, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
 import { SPOTIFY_SRC, TV_LEFT_YT, TV_RIGHT_YT, APPLE_URL } from "./MusicRoom";
 import { STUDY_ROOM_CAMERA, STUDY_PIECES, STUDY_DEFAULT_PIECE_IDX, STUDY_BOOK_TITLES } from "./FoundersStudy";
 import {
@@ -316,6 +316,9 @@ export default function GalleryScene() {
   const navProxy = useMemo(() => new THREE.Object3D(), []);
   const characterStateRef = useRef<CharacterOutState>({ position: new THREE.Vector3(0, 0, 1.5), yaw: 0 });
   const joystickInputRef = useRef({ forward: 0, turn: 0 });
+  // Authoritative instant-teleport channel to CharacterController — see
+  // snapCharacterTo below for why this replaced polling-for-convergence.
+  const snapTargetRef = useRef({ signal: 0, position: [0, 0, 0] as [number, number, number], yaw: 0 });
 
   // Pre-entry, GalleryRoom must keep driving the real camera (today's static
   // establishing shot) rather than the character proxy — same for portals.
@@ -499,12 +502,15 @@ export default function GalleryScene() {
   // finally reaching toIdx — empty when a direct line between them doesn't
   // cross anything.
   //
-  // Any corridor↔predictions crossing routes through BYPASS_PANEL_SOUTH_IDX
-  // first: the corridor-side stops near the entrance and the Predictions
-  // Wing doorway sit almost exactly on opposite sides of the Entry
-  // Chamber's thin display panel, so even this zone's own doorway waypoint
-  // doesn't help — verified by hand (line-segment vs the panel's AABB) for
-  // every corridor stop realistically routed through here.
+  // Any corridor↔predictions crossing routes through BYPASS_PANEL_WEST_IDX
+  // first: a straight line from the entrance-area corridor stops to the AI
+  // Predictions Wing doorway (which is west, x=-2.5) technically threads the
+  // gap beside the Entry Chamber's display panel (x:-0.95..0.95 @ z≈-1), but
+  // only by a sliver — too tight for the character's own width, so it reads
+  // as walking through the wall. Routing through a point that's actually
+  // west of the panel with real clearance (and already on the destination's
+  // side, so it costs no detour) keeps the character visibly walking around
+  // it instead.
   const getWaypointRoute = useCallback(
     (fromIdx: number, toIdx: number): number[] => {
       const waypoints: number[] = [];
@@ -523,9 +529,9 @@ export default function GalleryScene() {
       const fromZone = zoneOf(fromIdx);
       const toZone = zoneOf(toIdx);
       if (fromZone !== toZone) {
-        if (fromZone === "corridor" && toZone === "predictions") pushUnique(BYPASS_PANEL_SOUTH_IDX);
+        if (fromZone === "corridor" && toZone === "predictions") pushUnique(BYPASS_PANEL_WEST_IDX);
         if (fromZone !== "corridor" && fromIdx !== doorwayIdxOf(fromZone)) pushUnique(doorwayIdxOf(fromZone));
-        if (fromZone === "predictions" && toZone === "corridor") pushUnique(BYPASS_PANEL_SOUTH_IDX);
+        if (fromZone === "predictions" && toZone === "corridor") pushUnique(BYPASS_PANEL_WEST_IDX);
         if (toZone !== "corridor" && toIdx !== doorwayIdxOf(toZone)) pushUnique(doorwayIdxOf(toZone));
       }
       return waypoints;
@@ -617,11 +623,39 @@ export default function GalleryScene() {
     }
   }, []);
 
+  // Both handleSnapDone and handleDirectSnapDone (at every hop, not just the
+  // final one) fire when the camera PROXY reaches a target — not when the
+  // character (which chases the proxy with its own lag) has actually walked
+  // there. The previous approach polled characterStateRef with a timeout,
+  // waiting for the lagged chase to visually converge before advancing —
+  // but that timeout is wall-clock, while the chase's convergence rate is
+  // tied to actual simulation frames. At low FPS the simulation barely
+  // advances, so the poll routinely burned its full timeout doing nothing,
+  // reading as the character "stopping" for a couple seconds at whatever
+  // waypoint it was chasing, and could still hand off control before the
+  // yaw genuinely finished turning (frozen facing the wrong way). Snapping
+  // the character's position/yaw straight to the exact target the instant
+  // arrival is confirmed sidesteps convergence entirely — it's correct by
+  // construction, on the very next frame, regardless of frame rate.
+  const snapCharacterTo = useCallback((stopIdx: number) => {
+    const stop = STOPS[stopIdx];
+    if (!stop) return;
+    const [px, , pz] = stop.pos;
+    const [lx, , lz] = stop.lookAt;
+    const yawVal = Math.atan2(-(lx - px), -(lz - pz));
+    snapTargetRef.current = {
+      signal: snapTargetRef.current.signal + 1,
+      position: [px, 0, pz],
+      yaw: yawVal,
+    };
+  }, []);
+
   // Fires when GalleryRoom finishes a STOPS-axis snap.
   const handleSnapDone = useCallback(() => {
+    snapCharacterTo(Math.round(targetRef.current));
     snapRef.current = false;
     consumeSettleHandler();
-  }, [consumeSettleHandler]);
+  }, [consumeSettleHandler, snapCharacterTo]);
 
   // Fires when GalleryRoom finishes a direct A→B lerp (vault entry/exit/hop).
   // If a doorway-routed jump (see navigateToStop/getWaypointRoute) left more
@@ -629,41 +663,22 @@ export default function GalleryScene() {
   // tour's settle-handler (vault enter/skip prompt) must only fire once, on
   // true final arrival, not after every intermediate doorway hop.
   //
-  // This event fires when the camera PROXY (navProxy) reaches the waypoint —
-  // not the character. The character chases the proxy with its own separate
-  // lag (CharacterController), so advancing to the next waypoint immediately
-  // let the proxy race through an entire multi-hop route before the
-  // character's lagged chase visually reached even the first one — the
-  // character then just cut a straight line toward wherever the proxy ended
-  // up, defeating the whole point of routing around an obstacle (this was
-  // the actual cause of the goat-statue clipping and the "needs repeat
-  // clicks" feel, since the nav state said "arrived" while the character
-  // was visibly still catching up). Waiting here for the character to get
-  // reasonably close to the waypoint it just reached — not just the proxy —
-  // keeps the character's real path tracing the intended route.
+  // Each intermediate hop snaps the character to the waypoint it just
+  // reached before advancing the proxy to the next one — the character
+  // genuinely visits every waypoint in order (never cutting a straight line
+  // through an obstacle, which is the whole point of routing) without
+  // needing to wait for a smooth chase to catch up first.
   const handleDirectSnapDone = useCallback(() => {
+    if (directSnap) snapCharacterTo(directSnap.targetIdx);
     if (pendingWaypoints.current.length > 0) {
       const nextIdx = pendingWaypoints.current.shift()!;
       const next = STOPS[nextIdx];
-      const arrivedAt = navProxy.position.clone();
-      const advance = () => setDirectSnap({ pos: next.pos, lookAt: next.lookAt, targetIdx: nextIdx });
-      const CATCH_UP_DIST = 0.5;
-      const CATCH_UP_TIMEOUT_MS = 2000; // safety net — never block the chain forever
-      const startedAt = Date.now();
-      const checkCaughtUp = () => {
-        const closeEnough = characterStateRef.current.position.distanceTo(arrivedAt) < CATCH_UP_DIST;
-        if (closeEnough || Date.now() - startedAt > CATCH_UP_TIMEOUT_MS) {
-          advance();
-        } else {
-          setTimeout(checkCaughtUp, 80);
-        }
-      };
-      checkCaughtUp();
+      setDirectSnap({ pos: next.pos, lookAt: next.lookAt, targetIdx: nextIdx });
       return;
     }
     setDirectSnap(null);
     consumeSettleHandler();
-  }, [consumeSettleHandler, navProxy]);
+  }, [consumeSettleHandler, directSnap, snapCharacterTo]);
 
   useEffect(() => {
     const guidedActive = entered && autoTour && !anyOverlayOpen && !portalActive;
@@ -1215,6 +1230,7 @@ export default function GalleryScene() {
             outState={characterStateRef}
             resetSignal={resetSignal}
             resetTo={RESET_VIEW_SPAWN}
+            snapTargetRef={snapTargetRef}
           />
         </Suspense>
         <ThirdPersonCamera
