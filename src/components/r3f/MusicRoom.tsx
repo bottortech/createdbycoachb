@@ -566,7 +566,12 @@ export default function MusicRoom({ powerOn = false, currentPieceIdx = 3, onAlbu
               border: 0,
               display: "block",
               borderRadius: "8px",
-              width: "min(38vw, 520px)",
+              // Html renders this at literal CSS pixels, not scaled by 3D
+              // distance — 38vw reads fine on a wide desktop viewport but
+              // shrinks to a sliver on a narrow phone screen. clamp() keeps
+              // it usable on mobile without ballooning past the frame on
+              // desktop.
+              width: "clamp(220px, 70vw, 520px)",
             }}
           />
         </Html>

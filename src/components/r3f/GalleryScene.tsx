@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, BYPASS_PANEL_WEST_IDX, BYPASS_GOAT_WEST_IDX, BYPASS_GOAT_EAST_IDX, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
-import { SPOTIFY_SRC, TV_LEFT_YT, TV_RIGHT_YT, APPLE_URL } from "./MusicRoom";
+import { BOOKING_PAYMENT_URL } from "@/lib/links";
 import { STUDY_ROOM_CAMERA, STUDY_PIECES, STUDY_DEFAULT_PIECE_IDX, STUDY_BOOK_TITLES } from "./FoundersStudy";
 import {
   TRIBUTE_ROOM_CAMERA,
@@ -281,9 +281,9 @@ export default function GalleryScene() {
     setKeypadInput((prev) => prev.slice(0, -1));
   }, []);
 
-  // Mobile detection — on narrow viewports we swap the 3D music room for a
-  // clean 2D music-app layout (no camera / free-look / floor). The 3D scene
-  // stays mounted behind the overlay so portal enter/exit still works.
+  // Mobile detection — narrow-viewport tweaks (touch joystick, wider FOV,
+  // tribute room's flattened layout, etc). The hidden rooms (music/study)
+  // render the same real 3D room regardless of this flag.
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -354,6 +354,9 @@ export default function GalleryScene() {
 
   // Dev-only diagnostics — gated on NODE_ENV below so this never renders (or
   // ships) in production, but stays available locally via `npm run dev`.
+  // One-click hide for clean screenshots — panel comes back on next reload
+  // or by clicking the small pill it leaves behind.
+  const [debugHidden, setDebugHidden] = useState(false);
   const [resetSignal, setResetSignal] = useState(0);
   const cameraDebugRef = useRef<{ camPos: THREE.Vector3; camLook: THREE.Vector3 }>({
     camPos: new THREE.Vector3(),
@@ -381,11 +384,12 @@ export default function GalleryScene() {
           `char pos: ${c.position.x.toFixed(2)}, ${c.position.y.toFixed(2)}, ${c.position.z.toFixed(2)}  yaw: ${c.yaw.toFixed(2)}\n` +
           `cam pos:  ${cam.camPos.x.toFixed(2)}, ${cam.camPos.y.toFixed(2)}, ${cam.camPos.z.toFixed(2)}\n` +
           `navProxy: ${navProxy.position.x.toFixed(2)}, ${navProxy.position.y.toFixed(2)}, ${navProxy.position.z.toFixed(2)}\n` +
-          `showCharacter: ${showCharacter}  autoTour: ${autoTour}  snapping: ${snapRef.current}`
+          `showCharacter: ${showCharacter}  autoTour: ${autoTour}  snapping: ${snapRef.current}\n` +
+          `target: ${targetRef.current.toFixed(2)}  directSnap: ${directSnap ? `${directSnap.targetIdx}(${STOPS[directSnap.targetIdx]?.label})` : "null"}  pending: [${pendingWaypoints.current.join(",")}]`
       );
     }, 500);
     return () => clearInterval(id);
-  }, [navProxy, characterControlMode, showCharacter, autoTour, quality]);
+  }, [navProxy, characterControlMode, showCharacter, autoTour, quality, directSnap]);
 
   // Sync ref with state (ref for non-render reads, state for passing to Canvas).
   // Clamp to the full STOPS range so the map can directly address hidden stops
@@ -494,9 +498,11 @@ export default function GalleryScene() {
   // corridor's spine) — a skip-jump directly between them (e.g. Lush Brows
   // -> RetroRack Logo) cuts straight through it despite both being in the
   // open "corridor" zone. "The Standard" (the goat's own viewing stop,
-  // idx 11) is deliberately excluded — that's the intended close-up stop.
-  const GOAT_WEST_INDICES = new Set([7, 8, 9, 10]); // Carla's Creation, JB TV, Lush Brows, RetroRack
-  const GOAT_EAST_INDICES = new Set([12, 13, 14, 15, 16, 17, 18]); // RetroRack Logo .. Services
+  // idx 12) is deliberately excluded — that's the intended close-up stop.
+  // Indices shifted +1 from Carla's Creation onward after inserting the
+  // Vision Minds Entertainment stop ahead of them in STOPS.
+  const GOAT_WEST_INDICES = new Set([8, 9, 10, 11]); // Carla's Creation, JB TV, Lush Brows, RetroRack
+  const GOAT_EAST_INDICES = new Set([13, 14, 15, 16, 17, 18, 19]); // RetroRack Logo .. Services
 
   // Returns the sequence of intermediate stop indices to hop through before
   // finally reaching toIdx — empty when a direct line between them doesn't
@@ -1217,6 +1223,7 @@ export default function GalleryScene() {
               const found = PREDICTIONS.find((p) => p.slug === slug) ?? null;
               setSelectedPrediction(found);
             }}
+            characterStateRef={characterStateRef}
           />
         </Suspense>
 
@@ -1258,9 +1265,25 @@ export default function GalleryScene() {
           {`FPS: ${fpsRef.current.toFixed(0)} · ${quality === "high" ? "High" : "Balanced"} (tap)\nchar: ${characterStateRef.current.position.x.toFixed(2)}, ${characterStateRef.current.position.z.toFixed(2)}  yaw: ${characterStateRef.current.yaw.toFixed(2)}\ntarget: ${targetRef.current.toFixed(2)}`}
         </button>
       )}
-      {process.env.NODE_ENV === "development" && entered && !isMobile && (
+      {process.env.NODE_ENV === "development" && entered && !isMobile && debugHidden && (
+        <button
+          onClick={() => setDebugHidden(false)}
+          className="fixed top-4 right-4 z-[200] rounded bg-black/80 px-2 py-1 font-mono text-[10px] text-lime-300"
+        >
+          Show Debug
+        </button>
+      )}
+      {process.env.NODE_ENV === "development" && entered && !isMobile && !debugHidden && (
         <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 rounded-lg bg-black/80 p-3 font-mono text-[10px] leading-relaxed text-lime-300 whitespace-pre">
-          {debugHudText}
+          <div className="flex items-start justify-between gap-2">
+            {debugHudText}
+            <button
+              onClick={() => setDebugHidden(true)}
+              className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-gallery-muted hover:bg-white/20"
+            >
+              Hide
+            </button>
+          </div>
           <div className="mt-1 flex gap-1">
             <button
               onClick={goPrev}
@@ -1546,106 +1569,14 @@ export default function GalleryScene() {
         )}
       </AnimatePresence>
 
-      {/* Music-room — mobile 2D overlay. On narrow viewports we replace the
-          3D room with a clean vertical music-app layout: scrollable media
-          stack + a fixed bottom nav with the Exit control. The 3D scene
-          keeps running behind the overlay so portal enter/exit still works. */}
-      <AnimatePresence>
-        {isMobile && portalStage !== "none" && activePortal === "music" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.35 }}
-            className="fixed inset-0 z-40 overflow-y-auto bg-[#0a0806]"
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
-            <div className="flex min-h-full flex-col items-center px-5 pb-28 pt-6">
-              <div className="mb-1 text-[9px] font-medium uppercase tracking-[0.3em] text-gallery-accent/80">
-                Hidden Room
-              </div>
-              <h2 className="mb-6 text-lg font-light tracking-[0.25em] text-gallery-white">
-                MUSIC ROOM
-              </h2>
-
-              <div className="flex w-full max-w-[320px] flex-col items-stretch gap-5">
-                {/* Spotify */}
-                <div className="w-full overflow-hidden rounded-lg">
-                  <iframe
-                    title="Spotify"
-                    src={SPOTIFY_SRC}
-                    width="100%"
-                    height={352}
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy"
-                    style={{ border: 0, display: "block", width: "100%" }}
-                  />
-                </div>
-
-                {/* YouTube — Left TV video */}
-                <div
-                  className="w-full overflow-hidden rounded-lg"
-                  style={{ aspectRatio: "16 / 9" }}
-                >
-                  <iframe
-                    title="Video I"
-                    src={`https://www.youtube-nocookie.com/embed/${TV_LEFT_YT}?rel=0&playsinline=1&modestbranding=1`}
-                    allow="encrypted-media; picture-in-picture"
-                    allowFullScreen
-                    loading="lazy"
-                    style={{ border: 0, display: "block", width: "100%", height: "100%" }}
-                  />
-                </div>
-
-                {/* YouTube — Right TV video */}
-                <div
-                  className="w-full overflow-hidden rounded-lg"
-                  style={{ aspectRatio: "16 / 9" }}
-                >
-                  <iframe
-                    title="Video II"
-                    src={`https://www.youtube-nocookie.com/embed/${TV_RIGHT_YT}?rel=0&playsinline=1&modestbranding=1`}
-                    allow="encrypted-media; picture-in-picture"
-                    allowFullScreen
-                    loading="lazy"
-                    style={{ border: 0, display: "block", width: "100%", height: "100%" }}
-                  />
-                </div>
-
-                {/* Apple Music CTA */}
-                <a
-                  href={APPLE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block rounded-lg border border-gallery-accent/40 bg-gradient-to-b from-[#14110b] to-[#0a0806] py-3 text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-gallery-accent transition-colors hover:bg-gallery-accent hover:text-gallery-black"
-                >
-                  Listen on Apple Music
-                </a>
-              </div>
-            </div>
-
-            {/* Fixed bottom navigation — Exit the room */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0c0a08]/95 px-4 py-3 backdrop-blur-xl">
-              <button
-                onClick={handlePortalExit}
-                className="mx-auto flex items-center justify-center gap-2 rounded-full border border-gallery-accent/40 bg-gallery-accent px-6 py-2 text-[11px] font-medium uppercase tracking-[0.2em] text-gallery-black transition-all active:scale-95"
-              >
-                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Exit Music Room
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Music-room remote — sleek matte black pill with gold accents. Power
           button drives audio for the currently-selected TV; arrows cycle
-          through all 7 pieces in left-to-right pan order. Desktop only; the
-          mobile layout above has its own inline controls. */}
+          through all 7 pieces in left-to-right pan order. Renders on mobile
+          too, same as the Study remote below — the real 3D room (with the
+          same touch-drag look-around) is what's shown on every device now,
+          not a flattened stand-in. */}
       <AnimatePresence>
-        {portalStage === "inside" && !isMobile && activePortal === "music" && (
+        {portalStage === "inside" && activePortal === "music" && (
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -2360,7 +2291,7 @@ export default function GalleryScene() {
           <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-accent">30 Minutes</span>
           <div className="mt-3 mb-4"><span className="text-3xl font-extralight text-gallery-white">$75</span><span className="ml-2 text-xs text-gallery-muted/60">per session</span></div>
           <p className="mb-5 text-xs text-gallery-muted leading-relaxed">A focused session for quick strategy, feedback, or guidance.</p>
-          <a href="https://calendly.com/byron-brown31/30min" target="_blank" rel="noopener noreferrer" className="block w-full rounded-lg bg-gallery-accent py-3 text-center text-xs font-medium text-gallery-black hover:bg-gallery-accent/90">Book 30 Minutes</a>
+          <a href={BOOKING_PAYMENT_URL} target="_blank" rel="noopener noreferrer" className="block w-full rounded-lg bg-gallery-accent py-3 text-center text-xs font-medium text-gallery-black hover:bg-gallery-accent/90">Book 30 Minutes</a>
         </div>
       </GalleryOverlayPanel>
       <GalleryOverlayPanel open={activePanel === "commission"} onClose={() => setActivePanel(null)} label="Commission Desk" title="Start a Project">

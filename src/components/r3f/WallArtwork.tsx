@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useTexture, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { Project } from "../gallery/ProjectModal";
 import GalleryLight from "./GalleryLight";
+import type { CharacterOutState } from "./CharacterController";
 
 // Portal is only clickable when the camera is within this many world units.
 // ~3.5m covers both the dedicated portal stop (2m) and the WiggleWoo Character
@@ -51,6 +52,10 @@ interface WallArtworkProps {
   isPortal?: boolean;
   noPlaque?: boolean;
   noLight?: boolean;
+  /** Live character position — see the proximity check in useFrame below for
+   *  why the portal's tap-to-enter distance needs this instead of just the
+   *  camera. */
+  characterStateRef?: RefObject<CharacterOutState>;
 }
 
 export default function WallArtwork({
@@ -64,6 +69,7 @@ export default function WallArtwork({
   isPortal = false,
   noPlaque = false,
   noLight = false,
+  characterStateRef,
 }: WallArtworkProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
@@ -108,7 +114,16 @@ export default function WallArtwork({
     const targetZ = hovered ? 0.02 : 0;
     groupRef.current.position.z += (targetZ - groupRef.current.position.z) * 0.08;
     if (isPortal) {
-      portalReadyRef.current = camera.position.distanceTo(portalWorldPos.current) < PORTAL_PROXIMITY;
+      // While walking, the real camera trails the character by ~2.8m (see
+      // ThirdPersonCamera's BACK_DISTANCE) — checking camera.position alone
+      // means the character has to stand almost inside the wall before this
+      // reads "close enough" to tap-enter. Prefer the character's own
+      // position when available; x/z-only so the painting's mounted height
+      // doesn't add irrelevant distance.
+      const pos = characterStateRef?.current?.position ?? camera.position;
+      const dx = pos.x - portalWorldPos.current.x;
+      const dz = pos.z - portalWorldPos.current.z;
+      portalReadyRef.current = Math.sqrt(dx * dx + dz * dz) < PORTAL_PROXIMITY;
     }
   });
 

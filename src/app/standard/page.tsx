@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { PREDICTIONS } from "@/data/predictions";
 import Container from "@/components/Container";
+import { BOOKING_PAYMENT_URL } from "@/lib/links";
 
 const PROJECTS = [
   {
@@ -338,7 +339,7 @@ export default function StandardPage() {
                 </div>
               </a>
               <a
-                href="https://calendly.com"
+                href={BOOKING_PAYMENT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-gallery-charcoal/40 p-5 hover:border-gallery-accent/20 transition-all"

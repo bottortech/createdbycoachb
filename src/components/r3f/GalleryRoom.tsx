@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useState, useEffect } from "react";
+import { useRef, useMemo, useState, useEffect, type RefObject } from "react";
 import { useFrame, useThree, useLoader } from "@react-three/fiber";
 import { useTexture, Html, Text, MeshReflectorMaterial } from "@react-three/drei";
 import * as THREE from "three";
@@ -11,6 +11,7 @@ import WallArtwork from "./WallArtwork";
 import SpotLightWithTarget from "./SpotLightWithTarget";
 import HiddenLetter from "./HiddenLetter";
 import { DiamondPedestal, EnvelopePedestal, PhonePedestal, ConnectPedestal } from  "./ServicePedestal";
+import type { CharacterOutState } from "./CharacterController";
 
 // Lazy-loaded — not bundled with initial gallery payload
 const MusicRoom = dynamic(() => import("./MusicRoom"), { ssr: false });
@@ -68,6 +69,9 @@ export const STOPS: GalleryStop[] = [
   // Camera sits in the gallery just north of the widened doorway, elevated (y=2.5)
   // so the sight-line clears the lintel (y=2.6) and frames all 7 vitrines through the opening.
   { pos: [4, 2.5, -3.5],     lookAt: [4, 1.0, -9],           label: "Tech Vault",            tier: 2 },
+  // Vision Minds Entertainment — top wall, between the entrance and the
+  // Carla's Creation narrative run (matches the ARTWORKS entry's position).
+  { pos: [3, 1.7, GZ],       lookAt: [3, 1.7, GZ + GW],       label: "Vision Minds Entertainment", tier: 3 },
   // Client/creative — top wall
   { pos: [6, 1.7, GZ],       lookAt: [6, 1.7, GZ + GW],      label: "Carla's Creation",      tier: 3 },
   { pos: [7, 1.7, GZ],       lookAt: [7, 1.7, GZ - GW],      label: "JB TV",                 tier: 3 },
@@ -179,6 +183,16 @@ const ARTWORKS: ArtworkDef[] = [
     project: { title: "WiggleWoo's Word Quest", category: "Featured Exhibit", image: "/images/ipad-game-view.jpg",
       description: "An interactive reading game designed for early learners. Players tap letters to form words, move through themed environments, and build real reading skills through play.",
       tags: ["Interactive", "Phonics", "Early Reading"], link: "https://wigglewoo.app", linkLabel: "Join Waitlist" }},
+
+  // TOP WALL — open run of bare wall from x=0 (entry) to x=6 (Carla's
+  // Creation, first narrative piece below); nothing else occupies this span
+  // (Tech Vault's doorway is on the opposite/bottom wall at x=3..5). Centered
+  // in that gap for a prominent, balanced placement directly across from the
+  // Tech Vault doorway.
+  { position: [3, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.3, frame: "landscape",
+    project: { title: "Vision Minds Entertainment", category: "Website Design", image: "/images/silke-vme-website.png",
+      description: "Website for an entertainment company focused on creative ownership, mentorship, and authentic content for youth and hip-hop audiences.",
+      tags: ["Web Design", "Entertainment", "Client Work"], link: "https://www.visionmindsent.com/", linkLabel: "Visit Vision Minds Entertainment" }},
 
   // TOP WALL — narrative order: Carla, Lush Brows, Extension, By Any Means, WiggleWoo Character
   { position: [6, 1.85, GZ + GW], rotation: [0, Math.PI, 0], width: 0.85, frame: "portrait",
@@ -712,6 +726,14 @@ interface GalleryRoomProps {
    *  object instead of the real render camera — used so the third-person
    *  character can be driven by the exact same tour/portal choreography. */
   navTarget?: THREE.Object3D | null;
+  /** Live character position/yaw — used for the portal-proximity check below
+   *  when cameraDisabled is true (freely walking). The real camera trails
+   *  the character by a couple meters in that mode (ThirdPersonCamera's
+   *  boom offset), so checking camera.position against the portal painting
+   *  requires standing almost inside the wall before it registers as
+   *  "close enough." Checking the character's own position instead measures
+   *  what the user actually sees themselves standing next to. */
+  characterStateRef?: RefObject<CharacterOutState>;
 }
 
 export default function GalleryRoom({
@@ -750,6 +772,7 @@ export default function GalleryRoom({
   onSelectPrediction,
   navTarget = null,
   quality = "high",
+  characterStateRef,
 }: GalleryRoomProps) {
   const { camera: renderCamera } = useThree();
   const camera = navTarget ?? renderCamera;
@@ -898,6 +921,34 @@ export default function GalleryRoom({
   }, [freeLook]);
 
   useFrame(({ clock }, delta) => {
+    // Portal proximity + "Press E" hint — evaluated every frame regardless of
+    // cameraDisabled. While freely walking (the default mode now that the
+    // character replaced the free-roam camera), cameraDisabled is true and
+    // everything below this block is skipped — that used to silently skip
+    // this check too, so 'E' near a portal painting did nothing and the
+    // hint never appeared while walking (it only worked mid-scripted-jump).
+    // The real camera trails the character by ~2.8m in that mode (see
+    // ThirdPersonCamera's BACK_DISTANCE), so even a proximity check that DID
+    // run against camera.position would need the character almost inside
+    // the wall to register — using the character's own live position (via
+    // characterStateRef) instead measures what the user actually sees
+    // themselves standing next to. Horizontal-only (x/z) so the painting's
+    // wall-mounted height doesn't add irrelevant distance.
+    {
+      const posSource =
+        cameraDisabled && characterStateRef?.current
+          ? characterStateRef.current.position
+          : camera.position;
+      const dx = posSource.x - portalPaintingVec.current.x;
+      const dz = posSource.z - portalPaintingVec.current.z;
+      const ready = Math.sqrt(dx * dx + dz * dz) < 3.5 && !portalActive;
+      if (ready !== portalReadyState.current) {
+        portalReadyState.current = ready;
+        onPortalProximityChange?.(ready);
+        setPortalHintVisible(ready);
+      }
+    }
+
     if (cameraDisabled) return;
 
     const dt = Math.min(delta, 0.1); // clamp for tab-refocus safety
@@ -1100,14 +1151,6 @@ export default function GalleryRoom({
     const label = getLabel(smoothLook.current);
     onLabelChange(label);
     setFocusedLabel(moveDelta < 0.2 ? label : "");
-
-    // Portal proximity — fires only on edge transitions to avoid spamming React
-    const ready = camera.position.distanceTo(portalPaintingVec.current) < 3.5 && !portalActive;
-    if (ready !== portalReadyState.current) {
-      portalReadyState.current = ready;
-      onPortalProximityChange?.(ready);
-      setPortalHintVisible(ready);
-    }
   });
 
   const wc = "#a8a4a0";
@@ -1357,6 +1400,7 @@ export default function GalleryRoom({
             isPortal={art.isPortal}
             noPlaque={art.noPlaque}
             noLight={art.noLight}
+            characterStateRef={characterStateRef}
           />
         );
       })}

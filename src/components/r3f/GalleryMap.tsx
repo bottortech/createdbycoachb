@@ -23,6 +23,7 @@ const STOP_META: Record<string, { thumb: string; type: string }> = {
   "Client Reviews":         { thumb: "/images/coachb-services.png",       type: "Client Testimonials" },
   "AI Predictions Wing":    { thumb: "/images/coachb-services.png",       type: "AI Predictions Exhibit" },
   "The Authenticity Shift": { thumb: "/images/coachb-services.png",       type: "AI Prediction #001" },
+  "Vision Minds Entertainment": { thumb: "/images/silke-vme-website.png", type: "Website Design" },
 };
 
 interface GalleryMapProps {
