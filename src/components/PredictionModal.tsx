@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect } from "react";
 import Link from "next/link";
 import type { PredictionMeta } from "@/types/prediction";
+import PredictionStatusBadge from "./PredictionStatusBadge";
 
 interface PredictionModalProps {
   prediction: PredictionMeta | null;
@@ -73,18 +74,32 @@ export default function PredictionModal({ prediction, onClose }: PredictionModal
                   className="pointer-events-none absolute left-1/2 top-0 h-32 w-3/4 -translate-x-1/2 blur-3xl"
                   style={{ background: "radial-gradient(ellipse at center, rgba(201,168,76,0.08) 0%, transparent 70%)" }}
                 />
-                <p className="text-[10px] font-medium uppercase tracking-[0.45em] text-gallery-accent mb-3">
-                  AI Prediction {prediction.number}
-                </p>
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.45em] text-gallery-accent">
+                    AI Prediction {prediction.number}
+                  </p>
+                  <PredictionStatusBadge status={prediction.status} />
+                </div>
                 <h3 className="text-2xl font-light text-gallery-white leading-snug" style={{ paddingRight: "2.5rem" }}>
                   {prediction.title}
                 </h3>
                 <p className="mt-2 text-xs text-gallery-muted">
+                  Published{" "}
                   {new Date(prediction.date + "T12:00:00").toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
                   })}
+                  {prediction.lastUpdated && prediction.lastUpdated !== prediction.date && (
+                    <>
+                      {" · Updated "}
+                      {new Date(prediction.lastUpdated + "T12:00:00").toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </>
+                  )}
                   {" · "}
                   {prediction.category}
                 </p>

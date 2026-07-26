@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { getAllPredictionMeta } from "@/lib/predictions";
 import Container from "@/components/Container";
+import PredictionStatusBadge from "@/components/PredictionStatusBadge";
 
 import type { Metadata } from "next";
+
+// Re-checked hourly so a scheduled prediction's releaseDate crossing over
+// actually reveals it without waiting on a redeploy.
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "AI Predictions | Created by Coach B",
@@ -155,7 +160,7 @@ export default function PredictionsPage() {
                       marginBottom: "1.125rem",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", flexWrap: "wrap" }}>
                       <span
                         style={{
                           fontSize: "0.625rem",
@@ -167,6 +172,7 @@ export default function PredictionsPage() {
                       >
                         AI Prediction {p.number}
                       </span>
+                      <PredictionStatusBadge status={p.status} />
                       {p.featured && (
                         <span
                           style={{
@@ -192,12 +198,23 @@ export default function PredictionsPage() {
                         </span>
                       )}
                       <span style={{ fontSize: "0.6875rem", color: "rgba(138,138,138,0.6)" }}>
+                        Published{" "}
                         {new Date(p.date + "T12:00:00").toLocaleDateString("en-US", {
                           year: "numeric",
                           month: "short",
                           day: "numeric",
                         })}
                       </span>
+                      {p.lastUpdated && p.lastUpdated !== p.date && (
+                        <span style={{ fontSize: "0.6875rem", color: "rgba(138,138,138,0.6)" }}>
+                          · Updated{" "}
+                          {new Date(p.lastUpdated + "T12:00:00").toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      )}
                     </div>
                   </div>
 

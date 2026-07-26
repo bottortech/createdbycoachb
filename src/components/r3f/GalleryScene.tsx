@@ -17,7 +17,7 @@ import {
 } from "./TributeRoom";
 import ProjectModal, { Project } from "../gallery/ProjectModal";
 import PredictionModal from "../PredictionModal";
-import { PREDICTIONS } from "@/data/predictions";
+import { getPublishedPredictions } from "@/data/predictions";
 import type { PredictionMeta } from "@/types/prediction";
 import GalleryOverlayPanel from "./GalleryOverlayPanel";
 import GalleryMap from "./GalleryMap";
@@ -1220,7 +1220,7 @@ export default function GalleryScene() {
             onTributePortalClick={handleTributePortalClick}
             onTributeBenchClick={handleTributeBenchClick}
             onSelectPrediction={(slug) => {
-              const found = PREDICTIONS.find((p) => p.slug === slug) ?? null;
+              const found = getPublishedPredictions().find((p) => p.slug === slug) ?? null;
               setSelectedPrediction(found);
             }}
             characterStateRef={characterStateRef}

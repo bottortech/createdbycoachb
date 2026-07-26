@@ -4,11 +4,19 @@ import { compileMDX } from "next-mdx-remote/rsc";
 import { getAllPredictionMeta, getPredictionRaw } from "@/lib/predictions";
 import Container from "@/components/Container";
 import ShareButtons from "@/components/ShareButtons";
+import PredictionStatusBadge from "@/components/PredictionStatusBadge";
+import PredictionTimeline from "@/components/PredictionTimeline";
 import type { PredictionMeta } from "@/types/prediction";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
+
+// Re-checked hourly — see predictions/page.tsx. Also lets a slug that was
+// unreleased at build time (so absent from generateStaticParams below)
+// start resolving once its releaseDate passes, instead of 404ing forever.
+export const revalidate = 3600;
+export const dynamicParams = true;
 
 export async function generateStaticParams() {
   return getAllPredictionMeta().map((p) => ({ slug: p.slug }));
@@ -267,6 +275,11 @@ export default async function PredictionArticlePage({ params }: Props) {
                 </p>
               </div>
 
+              {/* Status */}
+              <div style={{ marginBottom: "1.25rem" }}>
+                <PredictionStatusBadge status={frontmatter.status} size="md" />
+              </div>
+
               {/* Meta row */}
               <div
                 style={{
@@ -277,8 +290,21 @@ export default async function PredictionArticlePage({ params }: Props) {
                 }}
               >
                 <span style={{ fontSize: "0.8125rem", color: "rgba(138,138,138,0.85)" }}>
-                  {formattedDate}
+                  Published {formattedDate}
                 </span>
+                {frontmatter.lastUpdated && frontmatter.lastUpdated !== frontmatter.date && (
+                  <>
+                    <span style={{ color: "rgba(255,255,255,0.08)" }}>·</span>
+                    <span style={{ fontSize: "0.8125rem", color: "rgba(138,138,138,0.85)" }}>
+                      Updated{" "}
+                      {new Date(frontmatter.lastUpdated + "T12:00:00").toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </>
+                )}
                 <span style={{ color: "rgba(255,255,255,0.08)" }}>·</span>
                 <span style={{ fontSize: "0.8125rem", color: "rgba(138,138,138,0.85)" }}>
                   {frontmatter.category}
@@ -326,9 +352,19 @@ export default async function PredictionArticlePage({ params }: Props) {
             </header>
 
             {/* ── Article body ── */}
-            <article style={{ paddingBottom: "4rem" }}>
+            <article style={{ paddingBottom: "2rem" }}>
               {content}
             </article>
+
+            {/* ── Evidence & Updates timeline ── */}
+            <div
+              style={{
+                borderTop: "1px solid rgba(255,255,255,0.06)",
+                paddingTop: "2.5rem",
+              }}
+            >
+              <PredictionTimeline updates={frontmatter.updates ?? []} />
+            </div>
 
             {/* ── Share row ── */}
             <div

@@ -3,9 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { PREDICTIONS } from "@/data/predictions";
+import { getPublishedPredictions } from "@/data/predictions";
 import Container from "@/components/Container";
 import { BOOKING_PAYMENT_URL } from "@/lib/links";
+import PredictionStatusBadge from "@/components/PredictionStatusBadge";
 
 const PROJECTS = [
   {
@@ -265,7 +266,7 @@ export default function StandardPage() {
               technology, and society. Each entry is a documented view of where things are heading — and why.
             </p>
             <div className="space-y-4 max-w-2xl">
-              {PREDICTIONS.map((p) => (
+              {getPublishedPredictions().map((p) => (
                 <Link
                   key={p.slug}
                   href={`/predictions/${p.slug}`}
@@ -275,9 +276,12 @@ export default function StandardPage() {
                     <span className="text-[9px] font-bold text-gallery-accent tracking-wider">{p.number}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.32em] text-gallery-accent mb-1.5">
-                      {p.category}
-                    </p>
+                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.32em] text-gallery-accent">
+                        {p.category}
+                      </p>
+                      <PredictionStatusBadge status={p.status} />
+                    </div>
                     <h3 className="text-base font-light text-gallery-white group-hover:text-gallery-accent transition-colors leading-snug">
                       {p.title}
                     </h3>
@@ -291,6 +295,12 @@ export default function StandardPage() {
                         </span>
                       ))}
                     </div>
+                    <p className="mt-3 text-[10px] text-gallery-muted/60">
+                      Published {new Date(p.date + "T12:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                      {p.lastUpdated && p.lastUpdated !== p.date && (
+                        <> · Updated {new Date(p.lastUpdated + "T12:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</>
+                      )}
+                    </p>
                   </div>
                 </Link>
               ))}

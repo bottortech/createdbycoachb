@@ -4,8 +4,8 @@ import { useRef, useState, useLayoutEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useTexture, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
-import { PREDICTIONS } from "@/data/predictions";
-import type { PredictionMeta } from "@/types/prediction";
+import { getPublishedPredictions } from "@/data/predictions";
+import { PREDICTION_STATUS_META, type PredictionMeta } from "@/types/prediction";
 import SpotLightWithTarget from "./SpotLightWithTarget";
 
 // South-facing alcove off the Gallery II / main gallery south wall at z=-4.
@@ -127,6 +127,28 @@ function PredictionFrame({
       >
         {prediction.coreIdea}
       </Text>
+
+      {/* Status badge — colored dot + label, single source of truth is
+          PREDICTION_STATUS_META so this always matches the DOM badges. */}
+      <group position={[0, -0.35, 0.003]}>
+        <mesh position={[-0.15, 0, 0]}>
+          <circleGeometry args={[0.014, 16]} />
+          <meshBasicMaterial
+            color={PREDICTION_STATUS_META[prediction.status].color}
+            toneMapped={false}
+          />
+        </mesh>
+        <Text
+          position={[-0.11, 0, 0]}
+          fontSize={0.032}
+          color={PREDICTION_STATUS_META[prediction.status].color}
+          letterSpacing={0.18}
+          anchorX="left"
+          anchorY="middle"
+        >
+          {PREDICTION_STATUS_META[prediction.status].label.toUpperCase()}
+        </Text>
+      </group>
 
       {/* Date */}
       <Text
@@ -416,7 +438,7 @@ export default function PredictionsWing({ onSelectPrediction }: PredictionsWingP
 
       {/* ── Prediction frames — centered on back wall ── */}
       {/* Main frame: The Authenticity Shift, center of back wall */}
-      {PREDICTIONS.map((pred) => (
+      {getPublishedPredictions().map((pred) => (
         <PredictionFrame
           key={pred.slug}
           position={[ALCOVE_CX, 1.85, ALCOVE_Z_MIN + 0.01]}
