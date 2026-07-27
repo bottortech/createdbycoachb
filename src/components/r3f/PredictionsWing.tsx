@@ -39,6 +39,12 @@ interface PredictionFrameProps {
   onSelect: (slug: string) => void;
   width?: number;
   height?: number;
+  /** Flanking frames are physically smaller than the main one — rather than
+   *  cramming the same content in at a shrunk size (the actual readability
+   *  problem being fixed here), compact drops the core-idea line entirely
+   *  and gives number/title/status/date their own generous layout. Full
+   *  content is always one click away in the modal regardless. */
+  compact?: boolean;
 }
 
 function PredictionFrame({
@@ -48,10 +54,12 @@ function PredictionFrame({
   onSelect,
   width = 1.6,
   height = 1.1,
+  compact = false,
 }: PredictionFrameProps) {
   const [hovered, setHovered] = useState(false);
   const glowRef = useRef<THREE.Mesh>(null);
   const PAD = 0.052;
+  const statusColor = PREDICTION_STATUS_META[prediction.status].color;
 
   useFrame(({ clock }) => {
     if (glowRef.current) {
@@ -76,7 +84,7 @@ function PredictionFrame({
         <meshStandardMaterial color="#06060e" />
       </mesh>
 
-      {/* Pulsing glow overlay */}
+      {/* Pulsing glow overlay — unchanged from before, not a new effect */}
       <mesh ref={glowRef} position={[0, 0, 0.001]}>
         <planeGeometry args={[width + PAD * 4, height + PAD * 4]} />
         <meshBasicMaterial color="#c9a84c" transparent opacity={0.06} depthWrite={false} />
@@ -84,10 +92,10 @@ function PredictionFrame({
 
       {/* Prediction number kicker */}
       <Text
-        position={[0, height / 2 - 0.1, 0.003]}
-        fontSize={0.048}
+        position={[0, height / 2 - 0.095, 0.003]}
+        fontSize={compact ? 0.042 : 0.054}
         color="#c9a84c"
-        letterSpacing={0.35}
+        letterSpacing={0.32}
         anchorX="center"
         anchorY="middle"
       >
@@ -95,54 +103,53 @@ function PredictionFrame({
       </Text>
 
       {/* Thin divider */}
-      <mesh position={[0, height / 2 - 0.2, 0.003]}>
+      <mesh position={[0, height / 2 - (compact ? 0.17 : 0.195), 0.003]}>
         <planeGeometry args={[width - 0.12, 0.002]} />
-        <meshBasicMaterial color="#c9a84c" transparent opacity={0.3} />
+        <meshBasicMaterial color="#c9a84c" transparent opacity={0.35} />
       </mesh>
 
       {/* Title */}
       <Text
-        position={[0, 0.1, 0.003]}
-        fontSize={0.085}
-        color="#f5f5f5"
-        maxWidth={width - 0.14}
+        position={[0, compact ? 0.09 : 0.21, 0.003]}
+        fontSize={compact ? 0.064 : 0.092}
+        color="#ffffff"
+        maxWidth={width - 0.12}
         textAlign="center"
         anchorX="center"
         anchorY="middle"
-        lineHeight={1.4}
+        lineHeight={1.3}
       >
         {prediction.title}
       </Text>
 
-      {/* Core idea */}
-      <Text
-        position={[0, -0.22, 0.003]}
-        fontSize={0.044}
-        color="rgba(180,180,195,0.7)"
-        maxWidth={width - 0.18}
-        textAlign="center"
-        anchorX="center"
-        anchorY="middle"
-        lineHeight={1.5}
-      >
-        {prediction.coreIdea}
-      </Text>
+      {/* Core idea — main frame only, see compact prop doc above */}
+      {!compact && (
+        <Text
+          position={[0, -0.08, 0.003]}
+          fontSize={0.048}
+          color="rgba(215,215,228,0.92)"
+          maxWidth={width - 0.1}
+          textAlign="center"
+          anchorX="center"
+          anchorY="middle"
+          lineHeight={1.5}
+        >
+          {prediction.coreIdea}
+        </Text>
+      )}
 
       {/* Status badge — colored dot + label, single source of truth is
           PREDICTION_STATUS_META so this always matches the DOM badges. */}
-      <group position={[0, -0.35, 0.003]}>
-        <mesh position={[-0.15, 0, 0]}>
-          <circleGeometry args={[0.014, 16]} />
-          <meshBasicMaterial
-            color={PREDICTION_STATUS_META[prediction.status].color}
-            toneMapped={false}
-          />
+      <group position={[0, compact ? -0.13 : -0.365, 0.003]}>
+        <mesh position={[compact ? -0.13 : -0.16, 0, 0]}>
+          <circleGeometry args={[compact ? 0.013 : 0.016, 16]} />
+          <meshBasicMaterial color={statusColor} toneMapped={false} />
         </mesh>
         <Text
-          position={[-0.11, 0, 0]}
-          fontSize={0.032}
-          color={PREDICTION_STATUS_META[prediction.status].color}
-          letterSpacing={0.18}
+          position={[compact ? -0.1 : -0.12, 0, 0]}
+          fontSize={compact ? 0.03 : 0.038}
+          color={statusColor}
+          letterSpacing={0.16}
           anchorX="left"
           anchorY="middle"
         >
@@ -152,10 +159,10 @@ function PredictionFrame({
 
       {/* Date */}
       <Text
-        position={[0, -(height / 2 - 0.1), 0.003]}
-        fontSize={0.03}
-        color="rgba(201,168,76,0.5)"
-        letterSpacing={0.12}
+        position={[0, -(height / 2 - 0.095), 0.003]}
+        fontSize={compact ? 0.028 : 0.036}
+        color="rgba(214,182,102,0.85)"
+        letterSpacing={0.1}
         anchorX="center"
         anchorY="middle"
       >
@@ -226,18 +233,18 @@ function PredictionFrame({
       />
 
       {/* Brass category plaque */}
-      <group position={[0, -(height / 2) - 0.065, 0.005]}>
+      <group position={[0, -(height / 2) - 0.068, 0.005]}>
         <mesh>
-          <boxGeometry args={[0.76, 0.068, 0.01]} />
+          <boxGeometry args={[0.76, 0.076, 0.01]} />
           <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
         </mesh>
         <Text
           position={[0, 0, 0.007]}
-          fontSize={0.024}
+          fontSize={0.028}
           color="#1a1108"
           anchorX="center"
           anchorY="middle"
-          letterSpacing={0.08}
+          letterSpacing={0.07}
         >
           {prediction.category.toUpperCase()}
         </Text>
@@ -457,6 +464,12 @@ export default function PredictionsWing({ onSelectPrediction }: PredictionsWingP
           return `#${String(published.length + placeholdersShown).padStart(3, "0")}`;
         };
 
+        // Pushed closer to the side walls than before (was ±0.9 from the
+        // room edge) to open up real breathing room around the main frame,
+        // which keeps its own size and position unchanged.
+        const FLANK_LEFT_X = ALCOVE_X_MIN + 0.65;
+        const FLANK_RIGHT_X = ALCOVE_X_MAX - 0.65;
+
         return (
           <>
             {mainPred && (
@@ -472,16 +485,17 @@ export default function PredictionsWing({ onSelectPrediction }: PredictionsWingP
 
             {flanking[0] ? (
               <PredictionFrame
-                position={[ALCOVE_X_MIN + 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
+                position={[FLANK_LEFT_X, 1.75, ALCOVE_Z_MIN + 0.01]}
                 rotation={[0, 0, 0]}
                 prediction={flanking[0]}
                 onSelect={onSelectPrediction}
                 width={1.0}
                 height={0.85}
+                compact
               />
             ) : (
               <PlaceholderPredictionFrame
-                position={[ALCOVE_X_MIN + 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
+                position={[FLANK_LEFT_X, 1.75, ALCOVE_Z_MIN + 0.01]}
                 rotation={[0, 0, 0]}
                 number={nextNumber()}
               />
@@ -489,16 +503,17 @@ export default function PredictionsWing({ onSelectPrediction }: PredictionsWingP
 
             {flanking[1] ? (
               <PredictionFrame
-                position={[ALCOVE_X_MAX - 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
+                position={[FLANK_RIGHT_X, 1.75, ALCOVE_Z_MIN + 0.01]}
                 rotation={[0, 0, 0]}
                 prediction={flanking[1]}
                 onSelect={onSelectPrediction}
                 width={1.0}
                 height={0.85}
+                compact
               />
             ) : (
               <PlaceholderPredictionFrame
-                position={[ALCOVE_X_MAX - 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
+                position={[FLANK_RIGHT_X, 1.75, ALCOVE_Z_MIN + 0.01]}
                 rotation={[0, 0, 0]}
                 number={nextNumber()}
               />
@@ -519,8 +534,8 @@ export default function PredictionsWing({ onSelectPrediction }: PredictionsWingP
         </mesh>
         <Text
           position={[0, 0.1, 0.003]}
-          fontSize={0.052}
-          color="rgba(201,168,76,0.55)"
+          fontSize={0.054}
+          color="rgba(212,184,120,0.85)"
           letterSpacing={0.28}
           anchorX="center"
           anchorY="middle"
@@ -529,8 +544,8 @@ export default function PredictionsWing({ onSelectPrediction }: PredictionsWingP
         </Text>
         <Text
           position={[0, -0.06, 0.003]}
-          fontSize={0.038}
-          color="rgba(180,190,215,0.35)"
+          fontSize={0.042}
+          color="rgba(200,208,228,0.6)"
           letterSpacing={0.12}
           textAlign="center"
           anchorX="center"
