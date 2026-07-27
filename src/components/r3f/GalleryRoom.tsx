@@ -62,7 +62,13 @@ export const STOPS: GalleryStop[] = [
   // AI Predictions Wing — south alcove branching off the gallery at z=-4, x=-3.5..-1.5 doorway.
   // Camera sits north of doorway, elevated, looking south into the alcove.
   { pos: [-2.5, 2.5, -3.5],   lookAt: [-2.5, 1.0, -7],        label: "AI Predictions Wing",   tier: 2 },
-  { pos: [-2.5, 1.7, -6],     lookAt: [-2.5, 1.7, -8.5],      label: "The Authenticity Shift", tier: 3 },
+  // Alcove-interior stop — narrative step-in-closer beat only (arrow-key
+  // walk / auto-tour). "__" prefix hides it from the main Gallery Map, same
+  // as the Tech Vault case stops below; individual predictions are browsed
+  // via the wing's own PredictionsMap, never their own nav entry (see
+  // insidePredictionsWing in GalleryScene.tsx) — this one stop no longer
+  // ties to a single prediction now that the archive has more than one.
+  { pos: [-2.5, 1.7, -6],     lookAt: [-2.5, 1.7, -8.5],      label: "__predictions_alcove", tier: 3 },
   // Gallery II — west wing (visited after predictions alcove)
   { pos: [-2, 1.7, GZ],      lookAt: [-16, 1.7, GZ],          label: "Gallery II",            tier: 1 },
   // Tech Vault — side alcove branching off the bottom wall at the x=3..5 doorway.

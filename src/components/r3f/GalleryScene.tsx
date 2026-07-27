@@ -22,6 +22,7 @@ import type { PredictionMeta } from "@/types/prediction";
 import GalleryOverlayPanel from "./GalleryOverlayPanel";
 import GalleryMap from "./GalleryMap";
 import TechVaultMap from "./TechVaultMap";
+import PredictionsMap from "./PredictionsMap";
 import TestimonialProjector from "../sections/TestimonialProjector";
 import CharacterController, { CharacterOutState } from "./CharacterController";
 import ThirdPersonCamera from "./ThirdPersonCamera";
@@ -790,6 +791,23 @@ export default function GalleryScene() {
     navigateToStop(mainGalleryStopIdx);
   }, [navigateToStop, mainGalleryStopIdx]);
 
+  // AI Predictions Wing state — mirrors insideVault/TechVaultMap above.
+  // Individual predictions never get their own STOPS entry (that clutters
+  // the main nav worse every month) — the wing's own map lists all of them
+  // directly, and picking one opens the modal in place rather than moving
+  // the camera to a dedicated position per prediction.
+  const insidePredictionsWing =
+    currentLabel === "AI Predictions Wing" || currentLabel === "__predictions_alcove";
+  const handleSelectPrediction = useCallback((slug: string) => {
+    const found = getPublishedPredictions().find((p) => p.slug === slug) ?? null;
+    setSelectedPrediction(found);
+  }, []);
+  const handlePredictionsWingReturn = useCallback(() => {
+    setMode("manual");
+    setDirectSnap(null);
+    navigateToStop(mainGalleryStopIdx);
+  }, [navigateToStop, mainGalleryStopIdx]);
+
   const toggleMusic = useCallback(() => {
     if (!audioRef.current) return;
     if (musicPlaying) audioRef.current.pause();
@@ -1219,10 +1237,7 @@ export default function GalleryScene() {
             onHireMe={() => setActivePanel("commission")}
             onTributePortalClick={handleTributePortalClick}
             onTributeBenchClick={handleTributeBenchClick}
-            onSelectPrediction={(slug) => {
-              const found = getPublishedPredictions().find((p) => p.slug === slug) ?? null;
-              setSelectedPrediction(found);
-            }}
+            onSelectPrediction={handleSelectPrediction}
             characterStateRef={characterStateRef}
           />
         </Suspense>
@@ -2241,9 +2256,10 @@ export default function GalleryScene() {
 
 
 
-      {/* Gallery Map — hidden while inside the music room. Swap to TechVaultMap
-          while the camera is inside the Tech Vault. */}
-      {!portalActive && !insideVault && (
+      {/* Gallery Map — hidden while inside the music room. Swaps to
+          TechVaultMap inside the Tech Vault, or PredictionsMap inside the
+          AI Predictions Wing, same pattern for both. */}
+      {!portalActive && !insideVault && !insidePredictionsWing && (
         <GalleryMap
           open={mapOpen}
           onClose={() => setMapOpen(false)}
@@ -2260,6 +2276,13 @@ export default function GalleryScene() {
           onSelectCase={handleVaultCaseSelect}
           onReturn={handleVaultReturn}
           currentCaseKey={currentCaseKey}
+        />
+      )}
+      {!portalActive && insidePredictionsWing && (
+        <PredictionsMap
+          open={mapOpen}
+          onSelectPrediction={handleSelectPrediction}
+          onReturn={handlePredictionsWingReturn}
         />
       )}
 

@@ -437,30 +437,75 @@ export default function PredictionsWing({ onSelectPrediction }: PredictionsWingP
       </mesh>
 
       {/* ── Prediction frames — centered on back wall ── */}
-      {/* Main frame: The Authenticity Shift, center of back wall */}
-      {getPublishedPredictions().map((pred) => (
-        <PredictionFrame
-          key={pred.slug}
-          position={[ALCOVE_CX, 1.85, ALCOVE_Z_MIN + 0.01]}
-          rotation={[0, 0, 0]}
-          prediction={pred}
-          onSelect={onSelectPrediction}
-          width={1.7}
-          height={1.15}
-        />
-      ))}
+      {/* Only 3 physical slots exist in this room (1 main + 2 flanking), but
+          the archive isn't capped at 3 — the wing's own PredictionsMap (see
+          insidePredictionsWing in GalleryScene.tsx) is how visitors reach
+          anything beyond what's physically on the wall. Main slot goes to
+          the featured prediction (falls back to the first published one);
+          the two flanking slots go to the next two, in order, and only fall
+          back to a "COMING SOON" placeholder when there genuinely isn't a
+          published prediction yet to fill that slot. */}
+      {(() => {
+        const published = getPublishedPredictions();
+        const mainPred = published.find((p) => p.featured) ?? published[0] ?? null;
+        const flanking = published.filter((p) => p.slug !== mainPred?.slug).slice(0, 2);
+        // Only increments when a slot actually needs a guessed number, so two
+        // empty slots get consecutive numbers instead of skipping one.
+        let placeholdersShown = 0;
+        const nextNumber = () => {
+          placeholdersShown += 1;
+          return `#${String(published.length + placeholdersShown).padStart(3, "0")}`;
+        };
 
-      {/* Placeholder frames flanking the main frame */}
-      <PlaceholderPredictionFrame
-        position={[ALCOVE_X_MIN + 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
-        rotation={[0, 0, 0]}
-        number="#002"
-      />
-      <PlaceholderPredictionFrame
-        position={[ALCOVE_X_MAX - 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
-        rotation={[0, 0, 0]}
-        number="#003"
-      />
+        return (
+          <>
+            {mainPred && (
+              <PredictionFrame
+                position={[ALCOVE_CX, 1.85, ALCOVE_Z_MIN + 0.01]}
+                rotation={[0, 0, 0]}
+                prediction={mainPred}
+                onSelect={onSelectPrediction}
+                width={1.7}
+                height={1.15}
+              />
+            )}
+
+            {flanking[0] ? (
+              <PredictionFrame
+                position={[ALCOVE_X_MIN + 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
+                rotation={[0, 0, 0]}
+                prediction={flanking[0]}
+                onSelect={onSelectPrediction}
+                width={1.0}
+                height={0.85}
+              />
+            ) : (
+              <PlaceholderPredictionFrame
+                position={[ALCOVE_X_MIN + 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
+                rotation={[0, 0, 0]}
+                number={nextNumber()}
+              />
+            )}
+
+            {flanking[1] ? (
+              <PredictionFrame
+                position={[ALCOVE_X_MAX - 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
+                rotation={[0, 0, 0]}
+                prediction={flanking[1]}
+                onSelect={onSelectPrediction}
+                width={1.0}
+                height={0.85}
+              />
+            ) : (
+              <PlaceholderPredictionFrame
+                position={[ALCOVE_X_MAX - 0.9, 1.75, ALCOVE_Z_MIN + 0.01]}
+                rotation={[0, 0, 0]}
+                number={nextNumber()}
+              />
+            )}
+          </>
+        );
+      })()}
 
       {/* Side-wall accent frame — west wall */}
       <group position={[ALCOVE_X_MIN + 0.015, 1.85, ALCOVE_CZ]} rotation={[0, Math.PI / 2, 0]}>
