@@ -17,6 +17,7 @@ import {
 } from "./TributeRoom";
 import ProjectModal, { Project } from "../gallery/ProjectModal";
 import PredictionModal from "../PredictionModal";
+import CertificationBadges from "../CertificationBadges";
 import { getPublishedPredictions } from "@/data/predictions";
 import type { PredictionMeta } from "@/types/prediction";
 import GalleryOverlayPanel from "./GalleryOverlayPanel";
@@ -2307,6 +2308,7 @@ export default function GalleryScene() {
       </GalleryOverlayPanel>
       <GalleryOverlayPanel open={activePanel === "studio"} onClose={() => setActivePanel(null)} label="The Studio" title="About Coach B">
         <div className="grid gap-3 sm:grid-cols-2">{[{ t: "Builder", d: "Creating software, tools, and digital products from concept to launch." }, { t: "Creative Technologist", d: "Blending design, code, and emerging tech to build unique experiences." }, { t: "Product Creator", d: "Shipping real products that solve real problems for real people." }, { t: "Founder", d: "Leading Bottor Technologies Inc. and building ventures from the ground up." }, { t: "Author", d: "Writing stories that inspire imagination and make learning feel alive." }].map((r) => (<div key={r.t} className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3"><p className="text-xs font-medium text-gallery-white">{r.t}</p><p className="mt-1 text-[11px] text-gallery-muted leading-relaxed">{r.d}</p></div>))}</div>
+        <div className="mt-8"><CertificationBadges /></div>
       </GalleryOverlayPanel>
       <GalleryOverlayPanel open={activePanel === "appointments"} onClose={() => setActivePanel(null)} label="Appointments" title="Book a 1:1 with Coach B">
         <p className="text-sm text-gallery-muted leading-relaxed mb-6">For product strategy, creative direction, business discussion, and project guidance.</p>

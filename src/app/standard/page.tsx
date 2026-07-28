@@ -7,6 +7,7 @@ import { getPublishedPredictions } from "@/data/predictions";
 import Container from "@/components/Container";
 import { BOOKING_PAYMENT_URL } from "@/lib/links";
 import PredictionStatusBadge from "@/components/PredictionStatusBadge";
+import CertificationBadges from "@/components/CertificationBadges";
 
 const PROJECTS = [
   {
@@ -158,6 +159,10 @@ export default function StandardPage() {
                   {tag}
                 </span>
               ))}
+            </div>
+
+            <div className="max-w-lg mb-14">
+              <CertificationBadges />
             </div>
 
             {/* 3D Gallery CTA card */}
