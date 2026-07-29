@@ -22,4 +22,18 @@ export const CERTIFICATIONS: Certification[] = [
     image: "/images/Essentials_badge_Leadership_NPR_5151f4d3-b545-4593-8718-e561b8135ed8.png",
     verifyUrl: "/images/leadership-essentials-certificate.pdf",
   },
+  {
+    title: "ICT Accessibility: The Key to Inclusive Communication",
+    issuer: "ITU Academy",
+    issuedDate: "2026-07-29",
+    image: "/images/itu-ict-accessibility-badge.png",
+    verifyUrl: "https://credentials.academy.itu.int/646e4ab0-2156-42ec-8a78-c82699b40d63",
+  },
+  {
+    title: "Nonprofit Essentials",
+    issuer: "NonprofitReady.org (Cornerstone OnDemand Foundation)",
+    issuedDate: "2026-07-29",
+    image: "/images/nonprofit-essentials-badge.png",
+    verifyUrl: "/images/nonprofit-essentials-certificate.pdf",
+  },
 ];
