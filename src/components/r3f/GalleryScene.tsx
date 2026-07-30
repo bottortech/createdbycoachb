@@ -1752,11 +1752,10 @@ export default function GalleryScene() {
       </AnimatePresence>
 
       {/* Scavenger-hunt HUD — subtle code tracker that appears once the user
-          has collected at least one letter. Shows fixed scaffolding (dash and
-          double-zero) plus blanks for the 4 findable characters. Hidden once
-          the study is unlocked. */}
+          Shows fixed scaffolding (dash and double-zero) plus blanks for the
+          4 findable characters. Hidden once the study is unlocked. */}
       <AnimatePresence>
-        {entered && !studyUnlocked && foundLetters.length > 0 && !portalActive && (
+        {entered && !studyUnlocked && !portalActive && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
