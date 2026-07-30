@@ -1,6 +1,7 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
+import { useProgress } from "@react-three/drei";
 import * as THREE from "three";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -98,6 +99,11 @@ function guidedDwellMs(stop: (typeof STOPS)[number]): number {
 }
 
 export default function GalleryScene() {
+  // useProgress works outside the Canvas — it reads a global Zustand store
+  // populated by Three.js's DefaultLoadingManager as textures/models load.
+  const { progress: loadProgress } = useProgress();
+  const sceneLoaded = loadProgress >= 100;
+
   const [entered, setEntered] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedPrediction, setSelectedPrediction] = useState<PredictionMeta | null>(null);
@@ -820,9 +826,9 @@ export default function GalleryScene() {
     setEntered(true);
     audioRef.current?.play().catch(() => {});
     setMusicPlaying(true);
-    // Hold the map off until WiggleWoo has fully popped in after the intro
-    // fade (500ms fade + a ~400ms beat for the piece to read on screen).
-    setTimeout(() => setMapOpen(true), 900);
+    // Hold the map off until the intro fade + first gallery frame settle.
+    // Exit is 200ms; 400ms beat for the first piece to read.
+    setTimeout(() => setMapOpen(true), 600);
   }, []);
 
   // Fade helper — ramps a single audio element to targetVol over durationMs
@@ -1331,35 +1337,61 @@ export default function GalleryScene() {
         </div>
       )}
 
-      {/* Intro */}
+      {/* Intro — stays mounted until the user has clicked AND the 3D scene is
+          fully loaded. This eliminates the "pop" that occurs when the canvas
+          is revealed before textures/geometry have finished streaming in. */}
       <AnimatePresence>
-        {!entered && (
-          <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#050403]">
-            <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.2, delay: 0.3 }} className="mb-4 text-[10px] font-medium uppercase tracking-[0.5em] text-gallery-accent/80">Welcome to the Gallery</motion.span>
-            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.2, delay: 0.8 }} className="text-center text-4xl font-extralight text-gallery-white md:text-6xl lg:text-7xl">Created by <span className="text-gallery-accent">Coach B</span></motion.h1>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 1.8 }} className="mt-4 text-sm text-gallery-muted">Builder. Designer. Founder. Author.</motion.p>
-            <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 2.8 }} onClick={handleEnter} className="mt-8 rounded-full border border-gallery-accent/40 px-6 py-2.5 text-xs font-medium tracking-wide text-gallery-accent transition-all hover:bg-gallery-accent hover:text-gallery-black">Enter the Gallery</motion.button>
-            {/* Secondary intro action — direct path to the Commission Desk
-                form for visitors who came to hire, not to browse. */}
-            <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 1, delay: 3.2 }}
-              onClick={() => {
-                handleEnter();
-                setActivePanel("commission");
-              }}
-              className="mt-4 text-[10px] uppercase tracking-[0.28em] text-gallery-muted transition-colors hover:text-gallery-accent"
-            >
-              Or start a project →
-            </motion.button>
+        {(!entered || !sceneLoaded) && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#050403]"
+          >
+            {!entered ? (
+              /* ── Normal intro state ── */
+              <>
+                <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.0, delay: 0.2 }} className="mb-4 text-[10px] font-medium uppercase tracking-[0.5em] text-gallery-accent/80">Welcome to the Gallery</motion.span>
+                <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.0, delay: 0.6 }} className="text-center text-4xl font-extralight text-gallery-white md:text-6xl lg:text-7xl">Created by <span className="text-gallery-accent">Coach B</span></motion.h1>
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 1.3 }} className="mt-4 text-sm text-gallery-muted">Builder. Designer. Founder. Author.</motion.p>
+                <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 1.9 }} onClick={handleEnter} className="mt-8 rounded-full border border-gallery-accent/40 px-6 py-2.5 text-xs font-medium tracking-wide text-gallery-accent transition-all hover:bg-gallery-accent hover:text-gallery-black">Enter the Gallery</motion.button>
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.8, delay: 2.2 }}
+                  onClick={() => { handleEnter(); setActivePanel("commission"); }}
+                  className="mt-4 text-[10px] uppercase tracking-[0.28em] text-gallery-muted transition-colors hover:text-gallery-accent"
+                >
+                  Or start a project →
+                </motion.button>
+              </>
+            ) : (
+              /* ── Post-click loading state — scene still streaming in ── */
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="flex flex-col items-center gap-3"
+              >
+                <div className="h-px w-32 overflow-hidden rounded-full bg-white/10">
+                  <motion.div
+                    className="h-full bg-gallery-accent"
+                    animate={{ width: `${loadProgress}%` }}
+                    transition={{ duration: 0.2 }}
+                  />
+                </div>
+                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-gallery-muted">
+                  Preparing gallery
+                </p>
+              </motion.div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Nav */}
       {entered && (
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="absolute top-0 left-0 right-0 z-20 bg-black/40 backdrop-blur-md border-b border-white/5">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="absolute top-0 left-0 right-0 z-20 bg-black/40 backdrop-blur-md border-b border-white/5">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 md:px-8">
             <span className="text-sm font-light tracking-widest text-gallery-white">COACH B</span>
             <div className="hidden items-center gap-1 lg:flex">
