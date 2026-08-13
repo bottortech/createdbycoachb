@@ -7,6 +7,7 @@ import * as THREE from "three";
 import dynamic from "next/dynamic";
 import { TDSLoader } from "three/examples/jsm/loaders/TDSLoader.js";
 import { Project } from "../gallery/ProjectModal";
+import { getProject } from "@/data/projects";
 import WallArtwork from "./WallArtwork";
 import SpotLightWithTarget from "./SpotLightWithTarget";
 import HiddenLetter from "./HiddenLetter";
@@ -184,11 +185,10 @@ interface ArtworkDef {
 }
 
 const ARTWORKS: ArtworkDef[] = [
-  // Entry — WiggleWoo
+  // Entry — WiggleWoo. Category overridden to "Featured Exhibit" for the
+  // opening plaque; every other field comes from the shared project data.
   { position: [0, 1.95, -1], rotation: [0, 0, 0], width: 1.7, frame: "landscape",
-    project: { title: "WiggleWoo's Word Quest", category: "Featured Exhibit", image: "/images/ipad-game-view.jpg",
-      description: "An interactive reading game designed for early learners. Players tap letters to form words, move through themed environments, and build real reading skills through play.",
-      tags: ["Interactive", "Phonics", "Early Reading"], link: "https://wigglewoo.app", linkLabel: "Join Waitlist" }},
+    project: { ...getProject("wigglewoo"), category: "Featured Exhibit" }},
 
   // TOP WALL — open run of bare wall from x=0 (entry) to x=6 (Carla's
   // Creation, first narrative piece below); nothing else occupies this span
@@ -196,50 +196,29 @@ const ARTWORKS: ArtworkDef[] = [
   // in that gap for a prominent, balanced placement directly across from the
   // Tech Vault doorway.
   { position: [3, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.3, frame: "landscape",
-    project: { title: "Vision Minds Entertainment", category: "Website Design", image: "/images/silke-vme-website.png",
-      description: "Website for an entertainment company focused on creative ownership, mentorship, and authentic content for youth and hip-hop audiences.",
-      tags: ["Web Design", "Entertainment", "Client Work"], link: "https://www.visionmindsent.com/", linkLabel: "Visit Vision Minds Entertainment" }},
+    project: getProject("vision-minds") },
 
   // TOP WALL — narrative order: Carla, Lush Brows, Extension, By Any Means, WiggleWoo Character
   { position: [6, 1.85, GZ + GW], rotation: [0, Math.PI, 0], width: 0.85, frame: "portrait",
-    project: { title: "Carla's Creation", category: "Branding", image: "/images/carlas-creation.jpg",
-      description: "Brand identity crafted with a personal, refined touch.",
-      tags: ["Branding", "Identity", "Design"] }},
+    project: getProject("carlas-creation") },
   { position: [8, 1.85, GZ + GW], rotation: [0, Math.PI, 0], width: 0.9, frame: "square",
-    project: { title: "Lush Brows", category: "Logo", image: "/images/lush-brows-logo.png",
-      description: "A clean, refined mark that reflects elegance and care.",
-      tags: ["Logo", "Beauty", "Identity"] }},
+    project: getProject("lush-brows") },
   { position: [10.5, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.0, frame: "square",
-    project: { title: "RetroRack Logo", category: "Logo", image: "/images/retro-rack-logo.jpg",
-      description: "Brand mark channeling the warmth of retro hardware.",
-      tags: ["Logo", "Brand Mark", "Tech"], link: "https://retrorack.app/", linkLabel: "Visit RetroRack" }},
+    project: getProject("retrorack-logo") },
   { position: [12.5, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.0, frame: "square",
-    project: { title: "By Any Means", category: "Logo", image: "/images/By-any-means-logo.jpg",
-      description: "Logo and identity design built to feel confident, focused, and bold.",
-      tags: ["Logo", "Brand Mark", "Identity"] }},
+    project: getProject("by-any-means") },
   { position: [15.5, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 0.85, frame: "portrait",
-    project: { title: "WiggleWoo Character", category: "Character Design", image: "/images/Wiggle-Woo-Character.png",
-      description: "Original character design for WiggleWoo's Word Quest.",
-      tags: ["Character Design", "Illustration"], link: "https://wigglewoo.app", linkLabel: "Visit WiggleWoo" }},
+    project: getProject("wigglewoo-character") },
 
   // BOTTOM WALL — JB TV, RetroRack, Bottor Assist, RetroRack Logo
   { position: [7, 1.95, GZ - GW], rotation: [0, 0, 0], width: 1.2, frame: "square",
-    project: { title: "JB TV", category: "Graphics", image: "/images/jb-tv.jpg",
-      description: "Visual graphics and branding for JB TV.",
-      tags: ["Graphics", "Branding", "Identity"] }},
+    project: getProject("jb-tv") },
   { position: [9, 1.9, GZ - GW], rotation: [0, 0, 0], width: 1.1, frame: "landscape",
-    project: { title: "RetroRack", category: "Web Application", image: "/images/retrorack-web-app.jpg",
-      description: "A web based platform for collecting, organizing, and showcasing retro tech.",
-      tags: ["Web App", "React", "Full Stack"], link: "https://retrorack.app/", linkLabel: "Visit RetroRack" }},
+    project: getProject("retrorack") },
   { position: [11.5, 1.9, GZ - GW], rotation: [0, 0, 0], width: 1.0, frame: "landscape",
-    project: { title: "Bottor Assist", category: "AI Powered Tool", image: "/images/bottor-assist.jpg",
-      description: "An intelligent assistant platform designed to streamline workflows and automate repetitive tasks.",
-      tags: ["AI", "Automation", "Productivity"], link: "https://bottor-assist-xxxxx.lovable.app/", linkLabel: "Explore Bottor Assist" }},
+    project: getProject("bottor-assist") },
   { position: [14, 1.85, GZ - GW], rotation: [0, 0, 0], width: 1.0, frame: "landscape",
-    project: { title: "RetroRack Extension", category: "Chrome Extension", image: "/images/retrorack-extension.jpg",
-      description: "The companion browser extension for RetroRack.",
-      tags: ["Chrome Extension", "Browser Tool"],
-      link: "https://chromewebstore.google.com/detail/dmofdijhloefhkhheimljfjchccgnhgf?utm_source=item-share-cb", linkLabel: "Get the Extension" }},
+    project: getProject("retrorack-extension") },
 
   // === East end wall cluster: left image + book + portal (evenly spaced) ===
   // Wall spans z from -4 to +1 (width 5m, centered at z = GZ = -1.5).
@@ -255,9 +234,7 @@ const ARTWORKS: ArtworkDef[] = [
 
   // Book — centered on end wall
   { position: [19, 2.0, GZ], rotation: [0, -Math.PI / 2, 0], width: 1.2, frame: "portrait",
-    project: { title: "Professor WiggleWoo", category: "Featured Publication", image: "/images/book-cover.jpg",
-      description: "A creative and imaginative story that brings wonder, learning, and fun to readers of all ages. This is more than a book. It is the beginning of a universe.",
-      tags: ["Published", "Children's Literature", "Education"], link: "https://a.co/d/0di3W4os", linkLabel: "Buy on Amazon" }},
+    project: getProject("professor-wigglewoo") },
 
   // Portal — chess king, right of book. Triggers the music room.
   { position: PORTAL_PAINTING_POS, rotation: [0, -Math.PI / 2, 0], width: 0.8, frame: "portrait",

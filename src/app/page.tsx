@@ -4,79 +4,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { getPublishedPredictions } from "@/data/predictions";
+import { PROJECTS } from "@/data/projects";
 import Container from "@/components/Container";
 import { BOOKING_PAYMENT_URL } from "@/lib/links";
 import PredictionStatusBadge from "@/components/PredictionStatusBadge";
 import CertificationBadges from "@/components/CertificationBadges";
-
-const PROJECTS = [
-  {
-    title: "WiggleWoo's Word Quest",
-    category: "Educational Game / Web App",
-    image: "/images/ipad-game-view.jpg",
-    description: "An interactive reading game designed for early learners. Players tap letters to form words, move through themed environments, and build real reading skills through play.",
-    tags: ["Interactive", "Phonics", "Early Reading"],
-    link: "https://wigglewoo.app",
-    linkLabel: "Join Waitlist",
-  },
-  {
-    title: "RetroRack",
-    category: "Web Application",
-    image: "/images/retrorack-web-app.jpg",
-    description: "A web based platform for collecting, organizing, and showcasing retro tech.",
-    tags: ["Web App", "React", "Full Stack"],
-    link: "https://retrorack.app/",
-    linkLabel: "Visit RetroRack",
-  },
-  {
-    title: "Bottor Assist",
-    category: "AI Powered Tool",
-    image: "/images/bottor-assist.jpg",
-    description: "An intelligent assistant platform designed to streamline workflows and automate repetitive tasks.",
-    tags: ["AI", "Automation", "Productivity"],
-    link: "https://bottor-assist-xxxxx.lovable.app/",
-    linkLabel: "Explore Bottor Assist",
-  },
-  {
-    title: "Professor WiggleWoo",
-    category: "Featured Publication",
-    image: "/images/book-cover.jpg",
-    description: "A creative and imaginative story that brings wonder, learning, and fun to readers of all ages. This is more than a book — it is the beginning of a universe.",
-    tags: ["Published", "Children's Literature", "Education"],
-    link: "https://a.co/d/0di3W4os",
-    linkLabel: "Buy on Amazon",
-  },
-  {
-    title: "Carla's Creation",
-    category: "Branding",
-    image: "/images/carlas-creation.jpg",
-    description: "Brand identity crafted with a personal, refined touch.",
-    tags: ["Branding", "Identity", "Design"],
-  },
-  {
-    title: "JB TV",
-    category: "Graphics",
-    image: "/images/jb-tv.jpg",
-    description: "Visual graphics and branding for JB TV.",
-    tags: ["Graphics", "Branding", "Identity"],
-  },
-  {
-    title: "RetroRack Extension",
-    category: "Chrome Extension",
-    image: "/images/retrorack-extension.jpg",
-    description: "The companion browser extension for RetroRack.",
-    tags: ["Chrome Extension", "Browser Tool"],
-    link: "https://chromewebstore.google.com/detail/dmofdijhloefhkhheimljfjchccgnhgf?utm_source=item-share-cb",
-    linkLabel: "Get the Extension",
-  },
-  {
-    title: "Lush Brows",
-    category: "Logo Design",
-    image: "/images/lush-brows-logo.png",
-    description: "A clean, refined mark that reflects elegance and care.",
-    tags: ["Logo", "Beauty", "Identity"],
-  },
-];
 
 function ArrowIcon({ className = "h-3 w-3" }: { className?: string }) {
   return (
@@ -213,7 +145,7 @@ export default function Home() {
               <div className="grid gap-6 sm:grid-cols-2">
                 {PROJECTS.map((project) => (
                   <div
-                    key={project.title}
+                    key={project.id}
                     className="group rounded-2xl border border-white/[0.06] bg-gallery-charcoal/40 overflow-hidden hover:border-gallery-accent/20 transition-all duration-300"
                   >
                     <div className="relative h-48 w-full bg-gallery-dark overflow-hidden">
@@ -237,7 +169,7 @@ export default function Home() {
                         {project.description}
                       </p>
                       <div className="mt-4 flex flex-wrap gap-1.5">
-                        {project.tags.map((tag) => (
+                        {(project.tags ?? []).map((tag) => (
                           <span
                             key={tag}
                             className="rounded-full bg-gallery-accent-soft px-2.5 py-0.5 text-[9px] font-medium text-gallery-accent"
