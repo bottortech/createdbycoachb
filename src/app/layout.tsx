@@ -15,12 +15,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Created by Coach B | The Gallery",
+  title: "Created by Coach B | Portfolio",
   description:
     "Builder. Designer. Founder. Author. Creating products, systems, and experiences that solve real problems and push ideas forward.",
   metadataBase: new URL("https://createdbycoachb.com"),
   openGraph: {
-    title: "Created by Coach B | The Gallery",
+    title: "Created by Coach B | Portfolio",
     description:
       "Builder. Designer. Founder. Author. Creating products, systems, and experiences that solve real problems and push ideas forward.",
     url: "https://createdbycoachb.com",
@@ -32,13 +32,13 @@ export const metadata: Metadata = {
         url: "/images/og-default.png",
         width: 1200,
         height: 630,
-        alt: "Created by Coach B — The Gallery",
+        alt: "Created by Coach B — Portfolio",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Created by Coach B | The Gallery",
+    title: "Created by Coach B | Portfolio",
     description:
       "Builder. Designer. Founder. Author. Creating products, systems, and experiences that solve real problems and push ideas forward.",
     images: ["/images/og-default.png"],

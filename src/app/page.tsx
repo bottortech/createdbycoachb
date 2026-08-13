@@ -1,100 +1,408 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
-import FeedbackToast from "@/components/FeedbackToast";
-import { detectWebGL } from "@/lib/webgl";
+import { getPublishedPredictions } from "@/data/predictions";
+import Container from "@/components/Container";
+import { BOOKING_PAYMENT_URL } from "@/lib/links";
+import PredictionStatusBadge from "@/components/PredictionStatusBadge";
+import CertificationBadges from "@/components/CertificationBadges";
 
-const GalleryScene = dynamic(
-  () => import("@/components/r3f/GalleryScene"),
-  { ssr: false }
-);
+const PROJECTS = [
+  {
+    title: "WiggleWoo's Word Quest",
+    category: "Educational Game / Web App",
+    image: "/images/ipad-game-view.jpg",
+    description: "An interactive reading game designed for early learners. Players tap letters to form words, move through themed environments, and build real reading skills through play.",
+    tags: ["Interactive", "Phonics", "Early Reading"],
+    link: "https://wigglewoo.app",
+    linkLabel: "Join Waitlist",
+  },
+  {
+    title: "RetroRack",
+    category: "Web Application",
+    image: "/images/retrorack-web-app.jpg",
+    description: "A web based platform for collecting, organizing, and showcasing retro tech.",
+    tags: ["Web App", "React", "Full Stack"],
+    link: "https://retrorack.app/",
+    linkLabel: "Visit RetroRack",
+  },
+  {
+    title: "Bottor Assist",
+    category: "AI Powered Tool",
+    image: "/images/bottor-assist.jpg",
+    description: "An intelligent assistant platform designed to streamline workflows and automate repetitive tasks.",
+    tags: ["AI", "Automation", "Productivity"],
+    link: "https://bottor-assist-xxxxx.lovable.app/",
+    linkLabel: "Explore Bottor Assist",
+  },
+  {
+    title: "Professor WiggleWoo",
+    category: "Featured Publication",
+    image: "/images/book-cover.jpg",
+    description: "A creative and imaginative story that brings wonder, learning, and fun to readers of all ages. This is more than a book — it is the beginning of a universe.",
+    tags: ["Published", "Children's Literature", "Education"],
+    link: "https://a.co/d/0di3W4os",
+    linkLabel: "Buy on Amazon",
+  },
+  {
+    title: "Carla's Creation",
+    category: "Branding",
+    image: "/images/carlas-creation.jpg",
+    description: "Brand identity crafted with a personal, refined touch.",
+    tags: ["Branding", "Identity", "Design"],
+  },
+  {
+    title: "JB TV",
+    category: "Graphics",
+    image: "/images/jb-tv.jpg",
+    description: "Visual graphics and branding for JB TV.",
+    tags: ["Graphics", "Branding", "Identity"],
+  },
+  {
+    title: "RetroRack Extension",
+    category: "Chrome Extension",
+    image: "/images/retrorack-extension.jpg",
+    description: "The companion browser extension for RetroRack.",
+    tags: ["Chrome Extension", "Browser Tool"],
+    link: "https://chromewebstore.google.com/detail/dmofdijhloefhkhheimljfjchccgnhgf?utm_source=item-share-cb",
+    linkLabel: "Get the Extension",
+  },
+  {
+    title: "Lush Brows",
+    category: "Logo Design",
+    image: "/images/lush-brows-logo.png",
+    description: "A clean, refined mark that reflects elegance and care.",
+    tags: ["Logo", "Beauty", "Identity"],
+  },
+];
+
+function ArrowIcon({ className = "h-3 w-3" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+    </svg>
+  );
+}
 
 export default function Home() {
-  const [webglState, setWebglState] = useState<"checking" | "high" | "medium" | "low" | "none">("checking");
-  const [bannerDismissed, setBannerDismissed] = useState(false);
-
-  useEffect(() => {
-    const result = detectWebGL();
-    if (!result.supported) {
-      setWebglState("none");
-    } else {
-      setWebglState(result.performance);
-    }
-    const dismissed = sessionStorage.getItem("coachb_standard_banner_dismissed");
-    if (dismissed) setBannerDismissed(true);
-  }, []);
-
-  const showBanner =
-    !bannerDismissed &&
-    webglState !== "checking" &&
-    (webglState === "none" || webglState === "low");
-
-  const showSubtleLink = !bannerDismissed && (webglState === "medium" || webglState === "high");
-
-  const handleDismiss = () => {
-    setBannerDismissed(true);
-    sessionStorage.setItem("coachb_standard_banner_dismissed", "1");
-  };
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   return (
     <>
-      <GalleryScene />
-      <FeedbackToast />
+      {/* Override the global overflow:hidden so this page scrolls normally */}
+      <style>{`
+        body { overflow: auto !important; height: auto !important; }
+      `}</style>
 
-      {/* Prominent fallback banner — shown when WebGL is unsupported or software-rendered */}
-      {showBanner && (
-        <div className="fixed bottom-6 left-1/2 z-200 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md">
-          <div className="flex items-start gap-3 rounded-2xl border border-gallery-accent/30 bg-gallery-charcoal/95 p-4 shadow-2xl backdrop-blur-md">
-            <div className="mt-0.5 h-7 w-7 shrink-0 rounded-full bg-gallery-accent/15 flex items-center justify-center">
-              <svg className="h-3.5 w-3.5 text-gallery-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z" />
+      <div
+        className="bg-gallery-black text-gallery-white min-h-screen"
+        style={{ overflowY: "auto", overflowX: "hidden" }}
+      >
+        {/* Ambient glow */}
+        <div className="pointer-events-none fixed inset-0 z-0" style={{
+          background: "radial-gradient(ellipse at 50% 0%, rgba(201,168,76,0.04) 0%, transparent 60%)",
+        }} />
+
+        {/* ── Navigation ── */}
+        <header className="sticky top-0 z-50 border-b border-white/5 bg-gallery-black/90 backdrop-blur-md">
+          <Container className="py-4 flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.42em] text-gallery-accent">
+              Created by Coach B
+            </span>
+            <nav className="hidden sm:flex items-center gap-8">
+              {["About", "Projects", "AI Predictions", "Contact"].map((label) => (
+                <a
+                  key={label}
+                  href={`#${label.toLowerCase().replace(/\s+/g, "-")}`}
+                  className="text-[10px] font-medium uppercase tracking-[0.22em] text-gallery-muted hover:text-gallery-accent transition-colors"
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
+            <Link
+              href="/gallery"
+              className="flex items-center gap-2 rounded-full border border-gallery-accent/40 bg-gallery-accent/10 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-accent transition-all hover:bg-gallery-accent hover:text-gallery-black"
+            >
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.328l5.603 3.113z" />
               </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gallery-white">
-                {webglState === "none" ? "3D not supported on this device" : "Performance may be limited"}
-              </p>
-              <p className="mt-0.5 text-[11px] text-gallery-muted leading-relaxed">
-                {webglState === "none"
-                  ? "Your browser doesn't support WebGL. Switch to the standard view for the full portfolio."
-                  : "Your device may struggle with the 3D gallery. The standard view loads instantly on any device."}
-              </p>
-              <div className="mt-3 flex items-center gap-3">
-                <Link
-                  href="/standard"
-                  className="rounded-full bg-gallery-accent px-4 py-1.5 text-[11px] font-medium tracking-wide text-gallery-black transition-all hover:bg-gallery-accent/90"
-                >
-                  Switch to Standard View
-                </Link>
-                <button
-                  onClick={handleDismiss}
-                  className="text-[10px] text-gallery-muted hover:text-gallery-white transition-colors"
-                >
-                  Stay in 3D
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+              Enter 3D Gallery
+            </Link>
+          </Container>
+        </header>
 
-      {/* Subtle standard view link — always available for users who want it */}
-      {showSubtleLink && (
-        <div className="fixed bottom-4 right-4 z-150">
-          <Link
-            href="/standard"
-            className="flex items-center gap-1.5 rounded-full border border-white/8 bg-black/60 px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.2em] text-gallery-muted backdrop-blur-sm transition-all hover:border-white/20 hover:text-gallery-white"
-          >
-            <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-            Standard View
-          </Link>
-        </div>
-      )}
+        <main className="relative z-10">
+
+          {/* ── Hero / About ── */}
+          <section id="about">
+            <Container className="pt-24 pb-24 border-b border-white/5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.48em] text-gallery-accent mb-6">
+                Portfolio
+              </p>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-gallery-white mb-7 leading-[1.15] tracking-tight max-w-2xl">
+                Created by Coach B
+              </h1>
+              <p className="text-gallery-muted text-lg leading-relaxed max-w-xl mb-5">
+                Builder. Designer. Founder. Author. Creating products, systems, and experiences
+                that solve real problems and push ideas forward.
+              </p>
+              <p className="text-gallery-muted/70 text-[13px] leading-relaxed max-w-xl mb-10">
+                Created by Coach B is the web development portfolio of Bottor Technologies Inc.,
+                showcasing custom websites, web applications, and digital solutions built for
+                businesses and organizations.
+              </p>
+              <div className="flex flex-wrap gap-2.5 mb-14">
+                {["Web Apps", "AI Tools", "Brand Identity", "Games", "Books", "Chrome Extensions"].map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-gallery-accent-soft border border-gallery-accent/20 px-4 py-1.5 text-[11px] font-medium text-gallery-accent"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+
+              <div className="max-w-lg mb-14">
+                <CertificationBadges />
+              </div>
+
+              {/* 3D Gallery CTA card */}
+              <div className="flex items-start gap-5 rounded-2xl border border-gallery-accent/20 bg-gallery-accent-soft p-6 max-w-lg">
+                <div className="mt-0.5 h-9 w-9 rounded-full bg-gallery-accent/20 flex items-center justify-center shrink-0">
+                  <svg className="h-4 w-4 text-gallery-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.328l5.603 3.113z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-gallery-white text-sm font-medium mb-1.5">
+                    Experience the 3D Gallery
+                  </p>
+                  <p className="text-gallery-muted text-[12px] leading-relaxed mb-4">
+                    The full portfolio lives inside an immersive 3D gallery. Walk through the space,
+                    discover hidden rooms, and explore work as a curated exhibit.
+                  </p>
+                  <Link
+                    href="/gallery"
+                    className="inline-flex items-center gap-2 text-[11px] font-medium text-gallery-accent hover:underline"
+                  >
+                    Enter the Gallery <ArrowIcon />
+                  </Link>
+                </div>
+              </div>
+            </Container>
+          </section>
+
+          {/* ── Projects ── */}
+          <section id="projects">
+            <Container className="pt-24 pb-24 border-b border-white/5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.48em] text-gallery-accent mb-4">
+                Work
+              </p>
+              <h2 className="text-3xl sm:text-4xl font-light text-gallery-white mb-3 tracking-tight">
+                Selected Projects
+              </h2>
+              <p className="text-gallery-muted leading-relaxed max-w-xl mb-14">
+                A cross-section of products, systems, and creative work built from scratch.
+              </p>
+              <div className="grid gap-6 sm:grid-cols-2">
+                {PROJECTS.map((project) => (
+                  <div
+                    key={project.title}
+                    className="group rounded-2xl border border-white/[0.06] bg-gallery-charcoal/40 overflow-hidden hover:border-gallery-accent/20 transition-all duration-300"
+                  >
+                    <div className="relative h-48 w-full bg-gallery-dark overflow-hidden">
+                      <Image
+                        src={project.image}
+                        alt={project.title}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 640px) 100vw, 50vw"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-gallery-charcoal/70 to-transparent" />
+                    </div>
+                    <div className="p-6">
+                      <span className="text-[9px] font-semibold uppercase tracking-[0.32em] text-gallery-accent">
+                        {project.category}
+                      </span>
+                      <h3 className="mt-2 text-base font-light text-gallery-white leading-snug">
+                        {project.title}
+                      </h3>
+                      <p className="mt-2.5 text-[12px] text-gallery-muted leading-relaxed line-clamp-2">
+                        {project.description}
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-1.5">
+                        {project.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full bg-gallery-accent-soft px-2.5 py-0.5 text-[9px] font-medium text-gallery-accent"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      {"link" in project && project.link && (
+                        <a
+                          href={project.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-5 inline-flex items-center gap-1.5 text-[11px] font-medium text-gallery-accent hover:underline"
+                        >
+                          {project.linkLabel ?? "View Project"} <ArrowIcon />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Container>
+          </section>
+
+          {/* ── AI Predictions ── */}
+          <section id="ai-predictions">
+            <Container className="pt-24 pb-24 border-b border-white/5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.48em] text-gallery-accent mb-4">
+                AI Predictions Wing
+              </p>
+              <h2 className="text-3xl sm:text-4xl font-light text-gallery-white mb-3 tracking-tight">
+                AI Predictions
+              </h2>
+              <p className="text-gallery-muted leading-relaxed max-w-xl mb-14">
+                Future-focused essays, frameworks, and predictions about AI, creativity, business,
+                technology, and society. Each entry is a documented view of where things are heading — and why.
+              </p>
+              <div className="space-y-4 max-w-2xl">
+                {getPublishedPredictions().map((p) => (
+                  <Link
+                    key={p.slug}
+                    href={`/predictions/${p.slug}`}
+                    className="group flex flex-col sm:flex-row gap-5 rounded-2xl border border-white/[0.06] bg-gallery-charcoal/40 p-6 hover:border-gallery-accent/20 transition-all duration-300"
+                  >
+                    <div className="shrink-0 h-12 w-12 rounded-xl border border-gallery-accent/30 bg-gallery-accent-soft flex items-center justify-center">
+                      <span className="text-[9px] font-bold text-gallery-accent tracking-wider">{p.number}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        <p className="text-[9px] font-semibold uppercase tracking-[0.32em] text-gallery-accent">
+                          {p.category}
+                        </p>
+                        <PredictionStatusBadge status={p.status} />
+                      </div>
+                      <h3 className="text-base font-light text-gallery-white group-hover:text-gallery-accent transition-colors leading-snug">
+                        {p.title}
+                      </h3>
+                      <p className="mt-2 text-[12px] text-gallery-muted leading-relaxed line-clamp-2">
+                        {p.coreIdea}
+                      </p>
+                      <div className="mt-3.5 flex flex-wrap gap-1.5">
+                        {p.tags.map((tag) => (
+                          <span key={tag} className="rounded-full bg-gallery-accent-soft px-2.5 py-0.5 text-[9px] font-medium text-gallery-accent">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-[10px] text-gallery-muted/60">
+                        Published {new Date(p.date + "T12:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                        {p.lastUpdated && p.lastUpdated !== p.date && (
+                          <> · Updated {new Date(p.lastUpdated + "T12:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</>
+                        )}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+                <div className="rounded-2xl border border-white/[0.04] bg-white/[0.01] p-6 text-center">
+                  <p className="text-[9px] uppercase tracking-[0.35em] text-gallery-muted">More predictions in progress</p>
+                  <p className="mt-1.5 text-[11px] text-gallery-muted/50">AI Prediction #002, #003...</p>
+                </div>
+              </div>
+              <div className="mt-10">
+                <Link
+                  href="/predictions"
+                  className="inline-flex items-center gap-2 text-[11px] font-medium text-gallery-accent hover:underline"
+                >
+                  View all AI Predictions <ArrowIcon />
+                </Link>
+              </div>
+            </Container>
+          </section>
+
+          {/* ── Contact ── */}
+          <section id="contact">
+            <Container className="pt-24 pb-32">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.48em] text-gallery-accent mb-4">
+                Contact
+              </p>
+              <h2 className="text-3xl sm:text-4xl font-light text-gallery-white mb-3 tracking-tight">
+                Start a Project
+              </h2>
+              <p className="text-gallery-muted leading-relaxed max-w-xl mb-14">
+                Available for web development, brand identity, AI tooling, and creative
+                consulting. Get in touch to discuss your project.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2 max-w-xl">
+                <a
+                  href="mailto:hello@createdbycoachb.com"
+                  className="group flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-gallery-charcoal/40 p-5 hover:border-gallery-accent/20 transition-all"
+                >
+                  <div className="h-11 w-11 rounded-xl bg-gallery-accent-soft flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-gallery-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.22em] text-gallery-muted mb-0.5">Email</p>
+                    <p className="text-sm text-gallery-white group-hover:text-gallery-accent transition-colors">Send a Message</p>
+                  </div>
+                </a>
+                <a
+                  href={BOOKING_PAYMENT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-gallery-charcoal/40 p-5 hover:border-gallery-accent/20 transition-all"
+                >
+                  <div className="h-11 w-11 rounded-xl bg-gallery-accent-soft flex items-center justify-center shrink-0">
+                    <svg className="h-4 w-4 text-gallery-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.22em] text-gallery-muted mb-0.5">Calendar</p>
+                    <p className="text-sm text-gallery-white group-hover:text-gallery-accent transition-colors">Book a Call</p>
+                  </div>
+                </a>
+              </div>
+            </Container>
+          </section>
+        </main>
+
+        {/* ── Footer ── */}
+        <footer className="relative z-10 border-t border-white/5">
+          <Container className="py-10 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <span className="text-[12px] text-gallery-muted text-center sm:text-left">
+              © {mounted ? new Date().getFullYear() : "2026"} Created by Coach B — Designed &amp; Developed by{" "}
+              <a
+                href="https://bottortechnologies.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gallery-muted underline decoration-gallery-muted/30 underline-offset-2 transition-colors duration-200 hover:text-gallery-accent hover:decoration-gallery-accent/50"
+              >
+                Bottor Technologies Inc.
+              </a>
+            </span>
+            <Link
+              href="/gallery"
+              className="inline-flex items-center gap-2 rounded-full border border-gallery-accent/40 px-5 py-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-accent transition-all hover:bg-gallery-accent hover:text-gallery-black"
+            >
+              Enter 3D Gallery <ArrowIcon />
+            </Link>
+          </Container>
+        </footer>
+      </div>
     </>
   );
 }

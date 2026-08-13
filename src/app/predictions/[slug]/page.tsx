@@ -433,7 +433,7 @@ export default async function PredictionArticlePage({ params }: Props) {
                     ← All Predictions
                   </Link>
                   <Link
-                    href="/"
+                    href="/gallery"
                     style={{
                       fontSize: "0.8125rem",
                       fontWeight: 500,
