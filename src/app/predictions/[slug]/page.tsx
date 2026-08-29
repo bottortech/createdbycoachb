@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: Props) {
 
   const title = `AI Prediction ${prediction.number}: ${prediction.title} | Created by Coach B`;
   const description = prediction.summary;
-  const url = `https://createdbycoachb.com/predictions/${slug}`;
+  const url = `https://www.createdbycoachb.com/predictions/${slug}`;
   const ogImage = {
     url: `/images/og-default.png`,
     width: 1200,
@@ -375,7 +375,7 @@ export default async function PredictionArticlePage({ params }: Props) {
               }}
             >
               <ShareButtons
-                url={`https://createdbycoachb.com/predictions/${slug}`}
+                url={`https://www.createdbycoachb.com/predictions/${slug}`}
                 title={`AI Prediction ${frontmatter.number}: ${frontmatter.title} — Created by Coach B`}
               />
             </div>

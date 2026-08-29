@@ -18,12 +18,12 @@ export const metadata: Metadata = {
   title: "Created by Coach B | Portfolio",
   description:
     "Builder. Designer. Founder. Author. Creating products, systems, and experiences that solve real problems and push ideas forward.",
-  metadataBase: new URL("https://createdbycoachb.com"),
+  metadataBase: new URL("https://www.createdbycoachb.com"),
   openGraph: {
     title: "Created by Coach B | Portfolio",
     description:
       "Builder. Designer. Founder. Author. Creating products, systems, and experiences that solve real problems and push ideas forward.",
-    url: "https://createdbycoachb.com",
+    url: "https://www.createdbycoachb.com",
     siteName: "Created by Coach B",
     locale: "en_US",
     type: "website",

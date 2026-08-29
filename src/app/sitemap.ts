@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getAllPredictionMeta } from "@/lib/predictions";
 
-const BASE = "https://createdbycoachb.com";
+const BASE = "https://www.createdbycoachb.com";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const predictions = getAllPredictionMeta();

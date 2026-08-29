@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     title: "AI Predictions | Created by Coach B",
     description:
       "Future-focused essays, frameworks, and predictions about AI, creativity, business, technology, and society.",
-    url: "https://createdbycoachb.com/predictions",
+    url: "https://www.createdbycoachb.com/predictions",
     siteName: "Created by Coach B",
     type: "website",
     images: [

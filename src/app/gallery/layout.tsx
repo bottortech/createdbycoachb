@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: "3D Gallery | Created by Coach B",
     description:
       "Walk through an immersive 3D gallery, discover hidden rooms, and explore the full portfolio as a curated exhibit.",
-    url: "https://createdbycoachb.com/gallery",
+    url: "https://www.createdbycoachb.com/gallery",
     siteName: "Created by Coach B",
     type: "website",
     images: [

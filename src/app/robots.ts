@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://createdbycoachb.com/sitemap.xml",
+    sitemap: "https://www.createdbycoachb.com/sitemap.xml",
   };
 }
