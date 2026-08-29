@@ -98,7 +98,7 @@ export const STOPS: GalleryStop[] = [
   { pos: [14, 1.7, GZ],      lookAt: [14, 1.7, GZ - GW],     label: "RetroRack Extension",   tier: 3 },
   // Character
   { pos: [15.5, 1.7, GZ],    lookAt: [15.5, 1.7, GZ + GW],   label: "WiggleWoo Character",   tier: 3 },
-  { pos: [17.5, 1.7, GZ],    lookAt: [17.5, 1.7, GZ + GW],   label: "Ladi Luck Loyalty",     tier: 3 },
+  { pos: [16.5, 1.7, GZ],    lookAt: [16.5, 1.7, GZ - GW],   label: "Ladi Luck Loyalty",     tier: 3 },
   // Closing
   { pos: [16.5, 1.7, GZ],    lookAt: [19, 1.9, GZ],          label: "Professor WiggleWoo",   tier: 1 },
   // Service pedestals — last auto-tour stop
@@ -199,7 +199,7 @@ const ARTWORKS: ArtworkDef[] = [
   { position: [3, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.3, frame: "landscape",
     project: getProject("vision-minds") },
 
-  // TOP WALL — narrative order: Carla, Lush Brows, Extension, By Any Means, WiggleWoo Character, Ladi Luck Loyalty
+  // TOP WALL — narrative order: Carla, Lush Brows, Extension, By Any Means, WiggleWoo Character
   { position: [6, 1.85, GZ + GW], rotation: [0, Math.PI, 0], width: 0.85, frame: "portrait",
     project: getProject("carlas-creation") },
   { position: [8, 1.85, GZ + GW], rotation: [0, Math.PI, 0], width: 0.9, frame: "square",
@@ -210,10 +210,8 @@ const ARTWORKS: ArtworkDef[] = [
     project: getProject("by-any-means") },
   { position: [15.5, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 0.85, frame: "portrait",
     project: getProject("wigglewoo-character") },
-  { position: [17.5, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.1, frame: "landscape",
-    project: getProject("ladi-luck-loyalty") },
 
-  // BOTTOM WALL — JB TV, RetroRack, Bottor Assist, RetroRack Extension
+  // BOTTOM WALL — JB TV, RetroRack, Bottor Assist, RetroRack Extension, Ladi Luck Loyalty
   { position: [7, 1.95, GZ - GW], rotation: [0, 0, 0], width: 1.2, frame: "square",
     project: getProject("jb-tv") },
   { position: [9, 1.9, GZ - GW], rotation: [0, 0, 0], width: 1.1, frame: "landscape",
@@ -222,6 +220,8 @@ const ARTWORKS: ArtworkDef[] = [
     project: getProject("bottor-assist") },
   { position: [14, 1.85, GZ - GW], rotation: [0, 0, 0], width: 1.0, frame: "landscape",
     project: getProject("retrorack-extension") },
+  { position: [16.5, 1.9, GZ - GW], rotation: [0, 0, 0], width: 1.1, frame: "landscape",
+    project: getProject("ladi-luck-loyalty") },
 
   // === East end wall cluster: left image + book + portal (evenly spaced) ===
   // Wall spans z from -4 to +1 (width 5m, centered at z = GZ = -1.5).
