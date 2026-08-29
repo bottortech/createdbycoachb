@@ -122,6 +122,14 @@ export const PROJECTS: ProjectEntry[] = [
     link: "https://wigglewoo.app",
     linkLabel: "Visit WiggleWoo",
   },
+  {
+    id: "ladi-luck-loyalty",
+    title: "Ladi Luck Loyalty Program",
+    category: "Loyalty Card Design",
+    image: "/images/loyalty-ladiluck-physical.png",
+    description: "Full loyalty program design for Ladi Luck Pet Apparel — a printed physical punch card and a digital Apple/Google Wallet card, both running the same rewards program: 1 paw per visit, 10 paws earns 50% off.",
+    tags: ["Physical Card", "Digital Wallet", "Loyalty Program", "Print Design"],
+  },
 ];
 
 export function getProject(id: string): ProjectEntry {

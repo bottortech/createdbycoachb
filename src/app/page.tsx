@@ -100,7 +100,7 @@ export default function Home() {
                 businesses and organizations.
               </p>
               <div className="flex flex-wrap gap-2.5 mb-14">
-                {["Web Apps", "AI Tools", "Brand Identity", "Games", "Books", "Chrome Extensions"].map((tag) => (
+                {["Web Apps", "AI Tools", "Brand Identity", "Loyalty Cards", "Games", "Books", "Chrome Extensions"].map((tag) => (
                   <span
                     key={tag}
                     className="rounded-full bg-gallery-accent-soft border border-gallery-accent/20 px-4 py-1.5 text-[11px] font-medium text-gallery-accent"
