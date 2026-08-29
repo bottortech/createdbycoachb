@@ -18,9 +18,20 @@ function ArrowIcon({ className = "h-3 w-3" }: { className?: string }) {
   );
 }
 
+function nextPredictionLabel(published: ReturnType<typeof getPublishedPredictions>): string {
+  const nums = published
+    .map((p) => parseInt(p.number.replace(/\D/g, ""), 10))
+    .filter((n) => !isNaN(n));
+  const max = nums.length ? Math.max(...nums) : 0;
+  const next = String(max + 1).padStart(3, "0");
+  const after = String(max + 2).padStart(3, "0");
+  return `AI Prediction #${next}, #${after}...`;
+}
+
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+  const published = getPublishedPredictions();
 
   return (
     <>
@@ -209,7 +220,7 @@ export default function Home() {
                 technology, and society. Each entry is a documented view of where things are heading — and why.
               </p>
               <div className="space-y-4 max-w-2xl">
-                {getPublishedPredictions().map((p) => (
+                {published.map((p) => (
                   <Link
                     key={p.slug}
                     href={`/predictions/${p.slug}`}
@@ -249,7 +260,7 @@ export default function Home() {
                 ))}
                 <div className="rounded-2xl border border-white/[0.04] bg-white/[0.01] p-6 text-center">
                   <p className="text-[9px] uppercase tracking-[0.35em] text-gallery-muted">More predictions in progress</p>
-                  <p className="mt-1.5 text-[11px] text-gallery-muted/50">AI Prediction #002, #003...</p>
+                  <p className="mt-1.5 text-[11px] text-gallery-muted/50">{nextPredictionLabel(published)}</p>
                 </div>
               </div>
               <div className="mt-10">

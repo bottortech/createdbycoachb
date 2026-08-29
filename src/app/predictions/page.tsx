@@ -292,7 +292,11 @@ export default function PredictionsPage() {
               More Coming
             </p>
             <p style={{ fontSize: "0.8125rem", color: "rgba(138,138,138,0.45)" }}>
-              AI Prediction #002, #003, and beyond are in progress.
+              {(() => {
+                const nums = predictions.map((p) => parseInt(p.number.replace(/\D/g, ""), 10)).filter((n) => !isNaN(n));
+                const next = Math.max(...nums) + 1;
+                return `AI Prediction #${String(next).padStart(3, "0")} and beyond are in progress.`;
+              })()}
             </p>
           </div>
         </Container>
