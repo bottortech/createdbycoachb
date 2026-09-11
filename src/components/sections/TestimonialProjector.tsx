@@ -2,28 +2,7 @@
 
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-
-interface Testimonial {
-  quote: string;
-  name: string;
-  title: string;
-}
-
-// Easy to extend — append a third entry here when ready
-const TESTIMONIALS: Testimonial[] = [
-  {
-    quote:
-      "I'm a returning client of Byron for years now! Ever since he helped create my logo design and event flyers it was only natural I return to him for my website design! He was able to achieve everything I was looking for in my website design and I'm very pleased with all of his work! He definitely goes above and beyond to get your projects done in a timely manner and is very engaging when asking questions to ensure he understood the assignment correctly before proceeding. I also love the way he presents you with several designs so you have a few to pick from! I definitely recommend him for any design, logo, website projects anyone has in mind! He's a very professional person and honest!",
-    name: "Maria",
-    title: "Owner, Lush Brows",
-  },
-  {
-    quote:
-      "Byron Brown has helped out tremendously with logos and graphic designs to help out my media platform JonnyBeeTV. He creatively put together my first ever logo and also made improvements and updates on my latest logo! Byron has also been very helpful with any ideas and advice on planning to help advance the JonnyBeeTV platform. I highly recommend his work!",
-    name: "JonnyBeeTV",
-    title: "Media Platform",
-  },
-];
+import { TESTIMONIALS, type Testimonial } from "@/data/testimonials";
 
 function ProjectorSVG() {
   return (
@@ -399,7 +378,7 @@ export default function TestimonialProjector({ open, onClose }: Props) {
               {/* ── Testimonial cards ─────────────────────────────────── */}
               <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
                 {TESTIMONIALS.map((t, i) => (
-                  <TestimonialCard key={i} testimonial={t} index={i} />
+                  <TestimonialCard key={t.id} testimonial={t} index={i} />
                 ))}
               </div>
             </div>

@@ -4,33 +4,10 @@ import { useTexture, Text, Html } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useMemo, useRef, useState } from "react";
+import { getSkillCategory, CHIP_IMAGES } from "@/data/skills";
 
 // Midpoint of the alcove (x axis) — used to drop click-cards toward the aisle
 const AISLE_CX = 3.75;
-
-// Chip label → logo PNG lookup. Keep in sync with files in public/images/tech-vault/.
-const CHIP_IMAGES: Record<string, string> = {
-  "React":       "/images/tech-vault/react.png",
-  "Vite":        "/images/tech-vault/vite.png",
-  "Three.js":    "/images/tech-vault/three-js.png",
-  "Extensions":  "/images/tech-vault/extension.png",
-  "Node.js":     "/images/tech-vault/nodejs.png",
-  "APIs":        "/images/tech-vault/api.png",
-  "Railway":     "/images/tech-vault/railway.png",
-  "Claude":      "/images/tech-vault/claude.png",
-  "ChatGPT":     "/images/tech-vault/chatgpt.png",
-  "AI APIs":     "/images/tech-vault/ai-api.png",
-  "Unity":       "/images/tech-vault/unity.png",
-  "C#":          "/images/tech-vault/csharp.png",
-  "Stripe":      "/images/tech-vault/stripe.png",
-  "Square":      "/images/tech-vault/square.png",
-  "VS Code":     "/images/tech-vault/vscode.png",
-  "Xcode":       "/images/tech-vault/xcode.png",
-  "GitHub":      "/images/tech-vault/github.png",
-  "PDF Parsing": "/images/tech-vault/pdf-parsing.png",
-  "Matching":    "/images/tech-vault/matching.png",
-  "Workflows":   "/images/tech-vault/workflows.png",
-};
 
 // Alcove geometry — branches off the gallery bottom wall (z=-4) at the
 // x=3..4 doorway, extending -z into a dedicated room.
@@ -63,17 +40,18 @@ interface CategoryData {
 }
 
 // 7 categories — 3 foundational in back row, 4 applied in front row.
-// AI Core is center-back (most prominent).
+// AI Core is center-back (most prominent). Content comes from the shared
+// src/data/skills.ts; only the 3D placement lives here.
 const CATEGORIES: CategoryData[] = [
   // Back row (z=-10, far wall) — foundational stack
-  { id: "backend",    position: [2, 0, -10],   title: "Backend",    tagline: "Systems that run without friction.",     chips: ["Node.js", "APIs", "Railway"] },
-  { id: "ai-core",    position: [4, 0, -10],   title: "AI Core",    tagline: "Where intelligence becomes execution.",  chips: ["Claude", "ChatGPT", "AI APIs"] },
-  { id: "frontend",   position: [6, 0, -10],   title: "Frontend",   tagline: "Interfaces that feel effortless.",       chips: ["React", "Vite", "Three.js", "Extensions"] },
+  { ...getSkillCategory("backend"),    position: [2, 0, -10] },
+  { ...getSkillCategory("ai-core"),    position: [4, 0, -10] },
+  { ...getSkillCategory("frontend"),   position: [6, 0, -10] },
   // Front row (z=-7.5, pushed back from the doorway) — applied domains
-  { id: "devtools",   position: [1.5, 0, -7.5], title: "Dev Tools",  tagline: "Built, tested, and shipped.",            chips: ["VS Code", "Xcode", "GitHub"] },
-  { id: "payments",   position: [3, 0, -7.5],   title: "Payments",   tagline: "Seamless transactions, real products.",  chips: ["Stripe", "Square"] },
-  { id: "gamedev",    position: [4.5, 0, -7.5], title: "Game Dev",   tagline: "Interactive worlds built from scratch.", chips: ["Unity", "C#"] },
-  { id: "automation", position: [6, 0, -7.5],   title: "Automation", tagline: "Turning processes into systems.",        chips: ["PDF Parsing", "Matching", "Workflows"] },
+  { ...getSkillCategory("devtools"),   position: [1.5, 0, -7.5] },
+  { ...getSkillCategory("payments"),   position: [3, 0, -7.5] },
+  { ...getSkillCategory("gamedev"),    position: [4.5, 0, -7.5] },
+  { ...getSkillCategory("automation"), position: [6, 0, -7.5] },
 ];
 
 // Animated logo plaque — gentle sine float + subtle rotation + emissive pulse.

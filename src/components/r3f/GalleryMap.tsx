@@ -24,6 +24,7 @@ const STOP_META: Record<string, { thumb: string; type: string }> = {
   "AI Predictions Wing":    { thumb: "/images/coachb-services.png",       type: "AI Predictions Exhibit" },
   "Vision Minds Entertainment": { thumb: "/images/silke-vme-website.png", type: "Website Design" },
   "Ladi Luck Loyalty":          { thumb: "/images/loyalty-ladiluck-physical.png", type: "Loyalty Card Design" },
+  "RYMA":                       { thumb: "/images/ryma-hero-virtual-studio.png", type: "Virtual Recording Studio (Web App)" },
 };
 
 interface GalleryMapProps {

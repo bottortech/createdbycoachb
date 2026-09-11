@@ -79,6 +79,9 @@ export const STOPS: GalleryStop[] = [
   // Vision Minds Entertainment — top wall, between the entrance and the
   // Carla's Creation narrative run (matches the ARTWORKS entry's position).
   { pos: [3, 1.7, GZ],       lookAt: [3, 1.7, GZ + GW],       label: "Vision Minds Entertainment", tier: 3 },
+  // Flagship — RYMA, placed next to Vision Minds in the same early open run
+  // on the top wall (matches the ARTWORKS entry's position).
+  { pos: [4.6, 1.7, GZ],     lookAt: [4.6, 1.7, GZ + GW],     label: "RYMA",                  tier: 2 },
   // Client/creative — top wall
   { pos: [6, 1.7, GZ],       lookAt: [6, 1.7, GZ + GW],      label: "Carla's Creation",      tier: 3 },
   { pos: [7, 1.7, GZ],       lookAt: [7, 1.7, GZ - GW],      label: "JB TV",                 tier: 3 },
@@ -198,6 +201,11 @@ const ARTWORKS: ArtworkDef[] = [
   // Tech Vault doorway.
   { position: [3, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.3, frame: "landscape",
     project: getProject("vision-minds") },
+
+  // Flagship — RYMA, placed next to Vision Minds in the same open run
+  // before Carla's Creation.
+  { position: [4.6, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.1, frame: "landscape",
+    project: getProject("ryma") },
 
   // TOP WALL — narrative order: Carla, Lush Brows, Extension, By Any Means, WiggleWoo Character
   { position: [6, 1.85, GZ + GW], rotation: [0, Math.PI, 0], width: 0.85, frame: "portrait",
