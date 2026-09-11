@@ -307,7 +307,7 @@ export default function Home() {
               </p>
               <div className="grid gap-4 sm:grid-cols-2 max-w-xl">
                 <a
-                  href="mailto:hello@createdbycoachb.com"
+                  href="mailto:ceo@bottortechnologies.com"
                   className="group flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-gallery-charcoal/40 p-5 hover:border-gallery-accent/20 transition-all"
                 >
                   <div className="h-11 w-11 rounded-xl bg-gallery-accent-soft flex items-center justify-center shrink-0">
