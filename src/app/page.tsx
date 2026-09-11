@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { getPublishedPredictions } from "@/data/predictions";
 import { PROJECTS } from "@/data/projects";
@@ -9,6 +8,10 @@ import Container from "@/components/Container";
 import { BOOKING_PAYMENT_URL } from "@/lib/links";
 import PredictionStatusBadge from "@/components/PredictionStatusBadge";
 import CertificationBadges from "@/components/CertificationBadges";
+import HeroShowcase from "@/components/HeroShowcase";
+import ProjectShowcase from "@/components/projects/ProjectShowcase";
+
+const NAV_LINKS = ["About", "Projects", "AI Predictions", "Contact"];
 
 function ArrowIcon({ className = "h-3 w-3" }: { className?: string }) {
   return (
@@ -30,7 +33,16 @@ function nextPredictionLabel(published: ReturnType<typeof getPublishedPrediction
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [menuOpen]);
   const published = getPublishedPredictions();
 
   return (
@@ -56,7 +68,7 @@ export default function Home() {
               Created by Coach B
             </span>
             <nav className="hidden sm:flex items-center gap-8">
-              {["About", "Projects", "AI Predictions", "Contact"].map((label) => (
+              {NAV_LINKS.map((label) => (
                 <a
                   key={label}
                   href={`#${label.toLowerCase().replace(/\s+/g, "-")}`}
@@ -66,17 +78,63 @@ export default function Home() {
                 </a>
               ))}
             </nav>
-            <Link
-              href="/gallery"
-              className="flex items-center gap-2 rounded-full border border-gallery-accent/40 bg-gallery-accent/10 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-accent transition-all hover:bg-gallery-accent hover:text-gallery-black"
-            >
-              <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.328l5.603 3.113z" />
-              </svg>
-              Enter 3D Gallery
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/gallery"
+                className="hidden items-center gap-2 rounded-full border border-gallery-accent/40 bg-gallery-accent/10 px-4 py-2 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-accent transition-all hover:bg-gallery-accent hover:text-gallery-black sm:flex"
+              >
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.328l5.603 3.113z" />
+                </svg>
+                Enter 3D Gallery
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-expanded={menuOpen}
+                aria-controls="mobile-nav-panel"
+                aria-label={menuOpen ? "Close menu" : "Open menu"}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-gallery-white transition-colors hover:border-gallery-accent/40 hover:text-gallery-accent sm:hidden"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  {menuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+                  )}
+                </svg>
+              </button>
+            </div>
           </Container>
+
+          {/* ── Mobile menu panel ── */}
+          {menuOpen && (
+            <div
+              id="mobile-nav-panel"
+              className="border-t border-white/5 bg-gallery-black/95 backdrop-blur-md sm:hidden"
+            >
+              <Container className="flex flex-col gap-1 py-4">
+                {NAV_LINKS.map((label) => (
+                  <a
+                    key={label}
+                    href={`#${label.toLowerCase().replace(/\s+/g, "-")}`}
+                    onClick={() => setMenuOpen(false)}
+                    className="rounded-lg px-3 py-3 text-[11px] font-medium uppercase tracking-[0.22em] text-gallery-muted transition-colors hover:bg-white/[0.03] hover:text-gallery-accent"
+                  >
+                    {label}
+                  </a>
+                ))}
+                <Link
+                  href="/gallery"
+                  onClick={() => setMenuOpen(false)}
+                  className="mt-2 flex items-center justify-center gap-2 rounded-full border border-gallery-accent/40 bg-gallery-accent/10 px-4 py-3 text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-accent"
+                >
+                  Enter 3D Gallery <ArrowIcon />
+                </Link>
+              </Container>
+            </div>
+          )}
         </header>
 
         <main className="relative z-10">
@@ -84,58 +142,67 @@ export default function Home() {
           {/* ── Hero / About ── */}
           <section id="about">
             <Container className="pt-24 pb-24 border-b border-white/5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.48em] text-gallery-accent mb-6">
-                Portfolio
-              </p>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-gallery-white mb-7 leading-[1.15] tracking-tight max-w-2xl">
-                Created by Coach B
-              </h1>
-              <p className="text-gallery-muted text-lg leading-relaxed max-w-xl mb-5">
-                Builder. Designer. Founder. Author. Creating products, systems, and experiences
-                that solve real problems and push ideas forward.
-              </p>
-              <p className="text-gallery-muted/70 text-[13px] leading-relaxed max-w-xl mb-10">
-                Created by Coach B is the web development portfolio of Bottor Technologies Inc.,
-                showcasing custom websites, web applications, and digital solutions built for
-                businesses and organizations.
-              </p>
-              <div className="flex flex-wrap gap-2.5 mb-14">
-                {["Web Apps", "AI Tools", "Brand Identity", "Loyalty Cards", "Games", "Books", "Chrome Extensions"].map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-gallery-accent-soft border border-gallery-accent/20 px-4 py-1.5 text-[11px] font-medium text-gallery-accent"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
+              <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-14">
+                <div className="order-last lg:order-first">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.48em] text-gallery-accent mb-6">
+                    Portfolio
+                  </p>
+                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light text-gallery-white mb-7 leading-[1.15] tracking-tight">
+                    Created by Coach B
+                  </h1>
+                  <p className="text-gallery-muted text-lg leading-relaxed max-w-xl mb-5">
+                    Builder. Designer. Founder. Author. Creating products, systems, and experiences
+                    that solve real problems and push ideas forward.
+                  </p>
+                  <p className="text-gallery-muted/70 text-[13px] leading-relaxed max-w-xl mb-10">
+                    Created by Coach B is the web development portfolio of Bottor Technologies Inc.,
+                    showcasing custom websites, web applications, and digital solutions built for
+                    businesses and organizations.
+                  </p>
+                  <div className="flex flex-wrap gap-2.5 mb-14">
+                    {["Web Apps", "AI Tools", "Brand Identity", "Loyalty Cards", "Games", "Books", "Chrome Extensions"].map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-gallery-accent-soft border border-gallery-accent/20 px-4 py-1.5 text-[11px] font-medium text-gallery-accent"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
 
-              <div className="max-w-lg mb-14">
-                <CertificationBadges />
-              </div>
+                  <div className="max-w-lg mb-14">
+                    <CertificationBadges />
+                  </div>
 
-              {/* 3D Gallery CTA card */}
-              <div className="flex items-start gap-5 rounded-2xl border border-gallery-accent/20 bg-gallery-accent-soft p-6 max-w-lg">
-                <div className="mt-0.5 h-9 w-9 rounded-full bg-gallery-accent/20 flex items-center justify-center shrink-0">
-                  <svg className="h-4 w-4 text-gallery-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.328l5.603 3.113z" />
-                  </svg>
+                  {/* 3D Gallery CTA card */}
+                  <div className="flex items-start gap-5 rounded-2xl border border-gallery-accent/20 bg-gallery-accent-soft p-6 max-w-lg">
+                    <div className="mt-0.5 h-9 w-9 rounded-full bg-gallery-accent/20 flex items-center justify-center shrink-0">
+                      <svg className="h-4 w-4 text-gallery-accent" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.328l5.603 3.113z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-gallery-white text-sm font-medium mb-1.5">
+                        Experience the 3D Gallery
+                      </p>
+                      <p className="text-gallery-muted text-[12px] leading-relaxed mb-4">
+                        The full portfolio lives inside an immersive 3D gallery. Walk through the space,
+                        discover hidden rooms, and explore work as a curated exhibit.
+                      </p>
+                      <Link
+                        href="/gallery"
+                        className="inline-flex items-center gap-2 text-[11px] font-medium text-gallery-accent hover:underline"
+                      >
+                        Enter the Gallery <ArrowIcon />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-gallery-white text-sm font-medium mb-1.5">
-                    Experience the 3D Gallery
-                  </p>
-                  <p className="text-gallery-muted text-[12px] leading-relaxed mb-4">
-                    The full portfolio lives inside an immersive 3D gallery. Walk through the space,
-                    discover hidden rooms, and explore work as a curated exhibit.
-                  </p>
-                  <Link
-                    href="/gallery"
-                    className="inline-flex items-center gap-2 text-[11px] font-medium text-gallery-accent hover:underline"
-                  >
-                    Enter the Gallery <ArrowIcon />
-                  </Link>
+
+                {/* Visual proof of work, up front — before the reader gets through the text */}
+                <div className="order-first lg:order-last">
+                  <HeroShowcase />
                 </div>
               </div>
             </Container>
@@ -153,56 +220,7 @@ export default function Home() {
               <p className="text-gallery-muted leading-relaxed max-w-xl mb-14">
                 A cross-section of products, systems, and creative work built from scratch.
               </p>
-              <div className="grid gap-6 sm:grid-cols-2">
-                {PROJECTS.map((project) => (
-                  <div
-                    key={project.id}
-                    className="group rounded-2xl border border-white/[0.06] bg-gallery-charcoal/40 overflow-hidden hover:border-gallery-accent/20 transition-all duration-300"
-                  >
-                    <div className="relative h-48 w-full bg-gallery-dark overflow-hidden">
-                      <Image
-                        src={project.image}
-                        alt={project.title}
-                        fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        sizes="(max-width: 640px) 100vw, 50vw"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-gallery-charcoal/70 to-transparent" />
-                    </div>
-                    <div className="p-6">
-                      <span className="text-[9px] font-semibold uppercase tracking-[0.32em] text-gallery-accent">
-                        {project.category}
-                      </span>
-                      <h3 className="mt-2 text-base font-light text-gallery-white leading-snug">
-                        {project.title}
-                      </h3>
-                      <p className="mt-2.5 text-[12px] text-gallery-muted leading-relaxed line-clamp-2">
-                        {project.description}
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-1.5">
-                        {(project.tags ?? []).map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded-full bg-gallery-accent-soft px-2.5 py-0.5 text-[9px] font-medium text-gallery-accent"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      {"link" in project && project.link && (
-                        <a
-                          href={project.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-5 inline-flex items-center gap-1.5 text-[11px] font-medium text-gallery-accent hover:underline"
-                        >
-                          {project.linkLabel ?? "View Project"} <ArrowIcon />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ProjectShowcase projects={PROJECTS} />
             </Container>
           </section>
 
