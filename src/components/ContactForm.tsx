@@ -67,9 +67,9 @@ export default function ContactForm() {
       <div>
         <label className={labelClass}>What Do You Need</label>
         <select name="project_type" required defaultValue="" className={`${inputClass} appearance-none`}>
-          <option value="" disabled>Select an option</option>
+          <option value="" disabled style={{ backgroundColor: "#1a1a1a", color: "#f5f5f5" }}>Select an option</option>
           {PROJECT_TYPES.map((t) => (
-            <option key={t} value={t}>{t}</option>
+            <option key={t} value={t} style={{ backgroundColor: "#1a1a1a", color: "#f5f5f5" }}>{t}</option>
           ))}
         </select>
       </div>
