@@ -279,7 +279,7 @@ function ProjectorDisplay() {
       flashingIn.current = true;
       setTimeout(() => {
         flashingIn.current = false;
-        setSlide((s) => (s + 1) % 3);
+        setSlide((s) => (s + 1) % 4);
       }, 80);
     };
     const id = setInterval(tick, 6000);
@@ -434,9 +434,26 @@ function ProjectorDisplay() {
           </Text>
         </group>
 
+        {/* ── Slide 3: Gigi / Ladi Luck ────────────────────────── */}
+        <group visible={slide === 3}>
+          <Text position={[-SW / 2 + 0.14, SH / 2 - 0.1, 0.005]} fontSize={0.048} color="#7a5acc" letterSpacing={0.35} anchorX="left" anchorY="middle">
+            03 / GIGI
+          </Text>
+          <Text position={[0, 0.08, 0.005]} fontSize={0.065} color="#dae1f8" maxWidth={SW - 0.18} textAlign="left" anchorX="center" anchorY="middle" lineHeight={1.55}>
+            {`"I had a great experience working with Byron! He was professional and really took the time to understand exactly what I was looking for. I would definitely recommend him to anyone looking for high-quality service. The final design was exactly what I pictured."`}
+          </Text>
+          <mesh position={[0, -(SH / 2 - 0.24), 0.004]}>
+            <planeGeometry args={[SW - 0.2, 0.002]} />
+            <meshBasicMaterial color="#5a4acc" transparent opacity={0.5} />
+          </mesh>
+          <Text position={[0, -(SH / 2 - 0.1), 0.005]} fontSize={0.068} color="#c8c2ff" anchorX="center" anchorY="middle">
+            Gigi  ·  Ladi Luck Pet Apparel & Grooming
+          </Text>
+        </group>
+
         {/* Slide dot indicators */}
-        {[0, 1, 2].map((i) => (
-          <mesh key={i} position={[(i - 1) * 0.09, -(SH / 2 + 0.065), 0.004]}>
+        {[0, 1, 2, 3].map((i) => (
+          <mesh key={i} position={[(i - 1.5) * 0.09, -(SH / 2 + 0.065), 0.004]}>
             <circleGeometry args={[0.013, 12]} />
             <meshBasicMaterial color={slide === i ? "#c8c2ff" : "#2e2e50"} transparent opacity={slide === i ? 0.9 : 0.5} />
           </mesh>
