@@ -9,11 +9,26 @@ const WEB3FORMS_ACCESS_KEY = "8cccd495-aec7-461a-9e68-8653dc65a19f";
 
 const PROJECT_TYPES = ["Website Build", "Branding / Design", "Automation Tools", "Other"];
 
-const inputClass =
-  "w-full rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-gallery-white placeholder-gallery-muted/40 outline-none focus:border-gallery-accent/40";
-const labelClass = "mb-1.5 block text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-muted";
+const COMPACT = {
+  input:
+    "w-full rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-gallery-white placeholder-gallery-muted/40 outline-none focus:border-gallery-accent/40",
+  label: "mb-1.5 block text-[10px] font-medium uppercase tracking-[0.2em] text-gallery-muted",
+};
 
-export default function ContactForm() {
+// Larger type and touch targets for the standard home page. The 3D gallery's
+// Commission Desk keeps the compact default.
+const COMFORTABLE = {
+  input:
+    "w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[15px] text-gallery-white placeholder-gallery-muted outline-none transition-colors focus:border-gallery-accent/60 focus:bg-white/[0.06]",
+  label: "mb-2 block text-[12px] font-medium uppercase tracking-[0.16em] text-gallery-light/80",
+};
+
+interface ContactFormProps {
+  size?: "compact" | "comfortable";
+}
+
+export default function ContactForm({ size = "compact" }: ContactFormProps = {}) {
+  const { input: inputClass, label: labelClass } = size === "comfortable" ? COMFORTABLE : COMPACT;
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -57,16 +72,28 @@ export default function ContactForm() {
       <input type="checkbox" name="botcheck" className="hidden" style={{ display: "none" }} tabIndex={-1} autoComplete="off" />
 
       <div>
-        <label className={labelClass}>Name</label>
-        <input type="text" name="name" required placeholder="Your full name" className={inputClass} />
+        <label htmlFor={`contact-name-${size}`} className={labelClass}>Name</label>
+        <input type="text" id={`contact-name-${size}`} name="name" required placeholder="Your full name" className={inputClass} />
       </div>
       <div>
-        <label className={labelClass}>Email</label>
-        <input type="email" name="email" required placeholder="your@email.com" className={inputClass} />
+        <label htmlFor={`contact-email-${size}`} className={labelClass}>Email</label>
+        <input type="email" id={`contact-email-${size}`} name="email" required placeholder="your@email.com" className={inputClass} />
       </div>
-      <div>
-        <label className={labelClass}>What Do You Need</label>
-        <select name="project_type" required defaultValue="" className={`${inputClass} appearance-none`}>
+      <div className="relative">
+        <label htmlFor={`contact-project_type-${size}`} className={labelClass}>What Do You Need</label>
+        {size === "comfortable" && (
+          <svg
+            aria-hidden
+            className="pointer-events-none absolute bottom-4 right-4 h-4 w-4 text-gallery-muted"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+          </svg>
+        )}
+        <select id={`contact-project_type-${size}`} name="project_type" required defaultValue="" className={`${inputClass} appearance-none ${size === "comfortable" ? "pr-10" : ""}`}>
           <option value="" disabled style={{ backgroundColor: "#1a1a1a", color: "#f5f5f5" }}>Select an option</option>
           {PROJECT_TYPES.map((t) => (
             <option key={t} value={t} style={{ backgroundColor: "#1a1a1a", color: "#f5f5f5" }}>{t}</option>
@@ -74,8 +101,8 @@ export default function ContactForm() {
         </select>
       </div>
       <div>
-        <label className={labelClass}>Message</label>
-        <textarea name="message" rows={4} required placeholder="Tell me about your project" className={`${inputClass} resize-none`} />
+        <label htmlFor={`contact-message-${size}`} className={labelClass}>Message</label>
+        <textarea id={`contact-message-${size}`} name="message" rows={4} required placeholder="Tell me about your project" className={`${inputClass} resize-none`} />
       </div>
 
       <button

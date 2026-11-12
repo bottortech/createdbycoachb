@@ -16,6 +16,11 @@ export interface ProjectEntry extends Project {
   /** Short status pill shown on the card, e.g. "In Development" — for work
    *  that isn't a shipped, live product yet. Omit once it ships. */
   status?: string;
+  /** How the standard page frames the image. "cover" fills the frame (good
+   *  for 16:10 screenshots and scene renders); "contain" shows the whole
+   *  image on a soft backdrop so logos, characters, and portrait artwork are
+   *  never cropped. Defaults to "cover". The 3D gallery ignores this. */
+  imageFit?: "cover" | "contain";
 }
 
 // Single source of truth for portfolio project content, shared by the
@@ -82,6 +87,7 @@ export const PROJECTS: ProjectEntry[] = [
     link: "https://a.co/d/0di3W4os",
     linkLabel: "Buy on Amazon",
     showcaseSize: "standard",
+    imageFit: "contain",
   },
   {
     id: "vision-minds",
@@ -102,6 +108,7 @@ export const PROJECTS: ProjectEntry[] = [
     description: "Brand identity crafted with a personal, refined touch.",
     tags: ["Branding", "Identity", "Design"],
     showcaseSize: "compact",
+    imageFit: "contain",
   },
   {
     id: "jb-tv",
@@ -111,6 +118,7 @@ export const PROJECTS: ProjectEntry[] = [
     description: "Visual graphics and branding for JB TV.",
     tags: ["Graphics", "Branding", "Identity"],
     showcaseSize: "compact",
+    imageFit: "contain",
   },
   {
     id: "retrorack-extension",
@@ -122,6 +130,7 @@ export const PROJECTS: ProjectEntry[] = [
     link: "https://chromewebstore.google.com/detail/dmofdijhloefhkhheimljfjchccgnhgf?utm_source=item-share-cb",
     linkLabel: "Get the Extension",
     showcaseSize: "compact",
+    imageFit: "contain",
   },
   {
     id: "lush-brows",
@@ -131,6 +140,7 @@ export const PROJECTS: ProjectEntry[] = [
     description: "A clean, refined mark that reflects elegance and care.",
     tags: ["Logo", "Beauty", "Identity"],
     showcaseSize: "compact",
+    imageFit: "contain",
   },
   {
     id: "retrorack-logo",
@@ -142,6 +152,7 @@ export const PROJECTS: ProjectEntry[] = [
     link: "https://retrorack.app/",
     linkLabel: "Visit RetroRack",
     showcaseSize: "compact",
+    imageFit: "contain",
   },
   {
     id: "by-any-means",
@@ -151,6 +162,7 @@ export const PROJECTS: ProjectEntry[] = [
     description: "Logo and identity design built to feel confident, focused, and bold.",
     tags: ["Logo", "Brand Mark", "Identity"],
     showcaseSize: "compact",
+    imageFit: "contain",
   },
   {
     id: "wigglewoo-character",
@@ -162,6 +174,7 @@ export const PROJECTS: ProjectEntry[] = [
     link: "https://wigglewoo.app",
     linkLabel: "Visit WiggleWoo",
     showcaseSize: "compact",
+    imageFit: "contain",
   },
   {
     id: "ladi-luck-loyalty",
@@ -171,6 +184,7 @@ export const PROJECTS: ProjectEntry[] = [
     description: "Full loyalty program design for Ladi Luck Pet Apparel — a printed physical punch card and a digital Apple/Google Wallet card, both running the same rewards program: 1 paw per visit, 10 paws earns 50% off.",
     tags: ["Physical Card", "Digital Wallet", "Loyalty Program", "Print Design"],
     showcaseSize: "compact",
+    imageFit: "contain",
   },
 ];
 
