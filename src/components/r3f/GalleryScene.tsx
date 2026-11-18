@@ -29,7 +29,8 @@ import TechVaultMap from "./TechVaultMap";
 import PredictionsMap from "./PredictionsMap";
 import TestimonialProjector from "../sections/TestimonialProjector";
 import CharacterController, { CharacterOutState } from "./CharacterController";
-import ThirdPersonCamera from "./ThirdPersonCamera";
+import ThirdPersonCamera, { type CameraFraming } from "./ThirdPersonCamera";
+import { getBoardSlots, getBoardView } from "./predictionsLayout";
 import MobileControls from "./MobileControls";
 import FPSMeter from "./FPSMeter";
 
@@ -329,6 +330,32 @@ export default function GalleryScene() {
   // Authoritative instant-teleport channel to CharacterController — see
   // snapCharacterTo below for why this replaced polling-for-convergence.
   const snapTargetRef = useRef({ signal: 0, position: [0, 0, 0] as [number, number, number], yaw: 0 });
+  // Held third-person framing for stops with a walkView (and prediction
+  // boards). ThirdPersonCamera clears it as soon as the avatar moves.
+  const cameraFramingRef = useRef<CameraFraming | null>(null);
+
+  // Teleports the avatar to stand at `avatar` facing `facing`, optionally
+  // holding a camera framing until the visitor moves.
+  const placeAvatar = useCallback(
+    (
+      avatar: [number, number, number],
+      facing: [number, number, number],
+      framing?: { camera: [number, number, number]; look: [number, number, number] }
+    ) => {
+      const [px, , pz] = avatar;
+      const [lx, , lz] = facing;
+      const yawVal = Math.atan2(-(lx - px), -(lz - pz));
+      snapTargetRef.current = {
+        signal: snapTargetRef.current.signal + 1,
+        position: [px, 0, pz],
+        yaw: yawVal,
+      };
+      cameraFramingRef.current = framing
+        ? { anchor: { x: px, z: pz, yaw: yawVal }, pos: framing.camera, look: framing.look }
+        : null;
+    },
+    []
+  );
 
   // Pre-entry, GalleryRoom must keep driving the real camera (today's static
   // establishing shot) rather than the character proxy — same for portals.
@@ -608,6 +635,8 @@ export default function GalleryScene() {
     // Invalidate any queued hops from an interrupted previous routed jump —
     // this new request fully supersedes it.
     pendingWaypoints.current = [];
+    // Leaving wherever we were: hand the camera back to the follow view.
+    cameraFramingRef.current = null;
     const waypoints = getWaypointRoute(currentIdx, destIdx);
     if (waypoints.length > 0) {
       updateTarget(destIdx);
@@ -669,15 +698,13 @@ export default function GalleryScene() {
   const snapCharacterTo = useCallback((stopIdx: number) => {
     const stop = STOPS[stopIdx];
     if (!stop) return;
-    const [px, , pz] = stop.pos;
-    const [lx, , lz] = stop.lookAt;
-    const yawVal = Math.atan2(-(lx - px), -(lz - pz));
-    snapTargetRef.current = {
-      signal: snapTargetRef.current.signal + 1,
-      position: [px, 0, pz],
-      yaw: yawVal,
-    };
-  }, []);
+    if (stop.walkView) {
+      const v = stop.walkView;
+      placeAvatar(v.avatar, v.facing, { camera: v.camera, look: v.look });
+    } else {
+      placeAvatar(stop.pos, stop.lookAt);
+    }
+  }, [placeAvatar]);
 
   // Fires when GalleryRoom finishes a STOPS-axis snap.
   const handleSnapDone = useCallback(() => {
@@ -821,9 +848,17 @@ export default function GalleryScene() {
   const insidePredictionsWing =
     currentLabel === "AI Predictions Wing" || currentLabel === "__predictions_alcove";
   const handleSelectPrediction = useCallback((slug: string) => {
-    const found = getPublishedPredictions().find((p) => p.slug === slug) ?? null;
-    setSelectedPrediction(found);
-  }, []);
+    const published = getPublishedPredictions();
+    const idx = published.findIndex((p) => p.slug === slug);
+    // Walk the visitor up to that prediction's board (same slot order the
+    // wing uses), so closing the modal leaves them looking right at it.
+    const slot = idx >= 0 ? getBoardSlots(published.length)[idx] : undefined;
+    if (slot) {
+      const v = getBoardView(slot);
+      placeAvatar(v.avatar, v.facing, { camera: v.camera, look: v.look });
+    }
+    setSelectedPrediction(idx >= 0 ? published[idx] : null);
+  }, [placeAvatar]);
   const handlePredictionsWingReturn = useCallback(() => {
     setMode("manual");
     setDirectSnap(null);
@@ -1282,6 +1317,7 @@ export default function GalleryScene() {
           characterState={characterStateRef}
           resetSignal={resetSignal}
           debugState={cameraDebugRef}
+          framing={cameraFramingRef}
         />
         <FPSMeter fpsRef={fpsRef} />
       </Canvas>

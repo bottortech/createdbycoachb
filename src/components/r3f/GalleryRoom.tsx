@@ -34,6 +34,17 @@ export interface GalleryStop {
   lookAt: [number, number, number];
   label: string;
   tier: 1 | 2 | 3; // timing tier
+  /** Optional walk-mode framing. By default the avatar stands at `pos`
+   *  facing `lookAt` and the follow camera sits behind it — which hides
+   *  anything low and straight ahead (e.g. the Services pedestals) behind the
+   *  avatar's own body. When set, the avatar stands at `avatar` facing
+   *  `facing`, and the camera holds `camera`/`look` until the visitor moves. */
+  walkView?: {
+    avatar: [number, number, number];
+    facing: [number, number, number];
+    camera: [number, number, number];
+    look: [number, number, number];
+  };
 }
 
 const EW = 3;
@@ -105,7 +116,12 @@ export const STOPS: GalleryStop[] = [
   // Closing
   { pos: [16.5, 1.7, GZ],    lookAt: [19, 1.9, GZ],          label: "Professor WiggleWoo",   tier: 1 },
   // Service pedestals — last auto-tour stop
-  { pos: [14, 2.8, GZ],       lookAt: [17.5, 0.5, GZ],        label: "Services",              tier: 2 },
+  // Walk mode: the avatar stands well back (x=14.2) with the camera raised
+  // behind it and aimed down at the pedestal row, so the avatar's head sits
+  // below every sight line to the pedestals instead of blocking the middle
+  // two. All four (z = GZ±1.2) fit a portrait phone's ~40° horizontal view.
+  { pos: [14, 2.8, GZ],       lookAt: [17.5, 0.5, GZ],        label: "Services",              tier: 2,
+    walkView: { avatar: [14.2, 0, GZ], facing: [17.5, 0.8, GZ], camera: [12.8, 2.75, GZ], look: [17.5, 0.8, GZ] } },
   // HIDDEN — portal approach on the east end wall. Reachable only by scrolling past Services.
   { pos: [17, 1.7, 0],        lookAt: [19, 1.85, 0],          label: "",                      tier: 3 },
   // HIDDEN — Tech Vault case stops (reachable only via the Tech Vault map).

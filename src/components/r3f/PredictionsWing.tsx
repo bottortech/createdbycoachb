@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { getPublishedPredictions } from "@/data/predictions";
 import { PREDICTION_STATUS_META, type PredictionMeta } from "@/types/prediction";
 import SpotLightWithTarget from "./SpotLightWithTarget";
+import { BOARD_HEIGHT, BOARD_WIDTH, getBoardSlots } from "./predictionsLayout";
 
 // South-facing alcove off the Gallery II / main gallery south wall at z=-4.
 // Doorway cut into the south wall at x=-3.5..-1.5.
@@ -45,6 +46,9 @@ interface PredictionFrameProps {
    *  and gives number/title/status/date their own generous layout. Full
    *  content is always one click away in the modal regardless. */
   compact?: boolean;
+  /** Per-board ceiling spotlight. Off for the wall boards, which share one
+   *  wash light per wall instead (lights are the main per-frame cost on phones). */
+  light?: boolean;
 }
 
 function PredictionFrame({
@@ -55,6 +59,7 @@ function PredictionFrame({
   width = 1.6,
   height = 1.1,
   compact = false,
+  light = true,
 }: PredictionFrameProps) {
   const [hovered, setHovered] = useState(false);
   const glowRef = useRef<THREE.Mesh>(null);
@@ -93,7 +98,7 @@ function PredictionFrame({
       {/* Prediction number kicker */}
       <Text
         position={[0, height / 2 - 0.095, 0.003]}
-        fontSize={compact ? 0.042 : 0.054}
+        fontSize={compact ? 0.05 : 0.054}
         color="#c9a84c"
         letterSpacing={0.32}
         anchorX="center"
@@ -111,7 +116,7 @@ function PredictionFrame({
       {/* Title */}
       <Text
         position={[0, compact ? 0.09 : 0.21, 0.003]}
-        fontSize={compact ? 0.064 : 0.092}
+        fontSize={compact ? 0.08 : 0.092}
         color="#ffffff"
         maxWidth={width - 0.12}
         textAlign="center"
@@ -147,7 +152,7 @@ function PredictionFrame({
         </mesh>
         <Text
           position={[compact ? -0.1 : -0.12, 0, 0]}
-          fontSize={compact ? 0.03 : 0.038}
+          fontSize={compact ? 0.034 : 0.038}
           color={statusColor}
           letterSpacing={0.16}
           anchorX="left"
@@ -160,7 +165,7 @@ function PredictionFrame({
       {/* Date */}
       <Text
         position={[0, -(height / 2 - 0.095), 0.003]}
-        fontSize={compact ? 0.028 : 0.036}
+        fontSize={compact ? 0.032 : 0.036}
         color="rgba(214,182,102,0.85)"
         letterSpacing={0.1}
         anchorX="center"
@@ -171,6 +176,20 @@ function PredictionFrame({
           month: "long",
         })}
       </Text>
+
+      {/* Always-visible read hint — touch screens never get the hover tooltip */}
+      {compact && (
+        <Text
+          position={[0, -0.25, 0.003]}
+          fontSize={0.027}
+          color="rgba(201,168,76,0.75)"
+          letterSpacing={0.22}
+          anchorX="center"
+          anchorY="middle"
+        >
+          TAP TO READ
+        </Text>
+      )}
 
       {/* Hover tooltip */}
       {hovered && (
@@ -221,21 +240,23 @@ function PredictionFrame({
       </mesh>
 
       {/* Ceiling spotlight */}
-      <SpotLightWithTarget
-        position={[position[0], ALCOVE_HEIGHT - 0.2, position[2] + 0.5]}
-        targetPosition={[position[0], position[1], position[2]]}
-        intensity={20}
-        angle={0.42}
-        penumbra={0.6}
-        distance={8}
-        castShadow={false}
-        color="#ffeedd"
-      />
+      {light && (
+        <SpotLightWithTarget
+          position={[position[0], ALCOVE_HEIGHT - 0.2, position[2] + 0.5]}
+          targetPosition={[position[0], position[1], position[2]]}
+          intensity={20}
+          angle={0.42}
+          penumbra={0.6}
+          distance={8}
+          castShadow={false}
+          color="#ffeedd"
+        />
+      )}
 
       {/* Brass category plaque */}
       <group position={[0, -(height / 2) - 0.068, 0.005]}>
         <mesh>
-          <boxGeometry args={[0.76, 0.076, 0.01]} />
+          <boxGeometry args={[Math.max(0.76, width * 0.86), 0.076, 0.01]} />
           <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
         </mesh>
         <Text
@@ -245,55 +266,12 @@ function PredictionFrame({
           anchorX="center"
           anchorY="middle"
           letterSpacing={0.07}
+          maxWidth={Math.max(0.72, width * 0.82)}
+          textAlign="center"
         >
           {prediction.category.toUpperCase()}
         </Text>
       </group>
-    </group>
-  );
-}
-
-// ── Placeholder frame ─────────────────────────────────────────────────────────
-
-function PlaceholderPredictionFrame({
-  position,
-  rotation,
-  number,
-}: {
-  position: [number, number, number];
-  rotation: [number, number, number];
-  number: string;
-}) {
-  return (
-    <group position={position} rotation={rotation}>
-      <mesh position={[0, 0, -0.016]}>
-        <boxGeometry args={[1.1, 0.82, 0.016]} />
-        <meshStandardMaterial color="#c9a84c" metalness={0.6} roughness={0.35} />
-      </mesh>
-      <mesh>
-        <planeGeometry args={[1.0, 0.72]} />
-        <meshStandardMaterial color="#06060e" />
-      </mesh>
-      <Text
-        position={[0, 0.1, 0.003]}
-        fontSize={0.042}
-        color="rgba(201,168,76,0.28)"
-        letterSpacing={0.3}
-        anchorX="center"
-        anchorY="middle"
-      >
-        {`AI PREDICTION ${number}`}
-      </Text>
-      <Text
-        position={[0, -0.07, 0.003]}
-        fontSize={0.052}
-        color="rgba(201,168,76,0.2)"
-        letterSpacing={0.18}
-        anchorX="center"
-        anchorY="middle"
-      >
-        COMING SOON
-      </Text>
     </group>
   );
 }
@@ -443,87 +421,65 @@ export default function PredictionsWing({ onSelectPrediction }: PredictionsWingP
         />
       </mesh>
 
-      {/* ── Prediction frames — centered on back wall ── */}
-      {/* Only 3 physical slots exist in this room (1 main + 2 flanking), but
-          the archive isn't capped at 3 — the wing's own PredictionsMap (see
-          insidePredictionsWing in GalleryScene.tsx) is how visitors reach
-          anything beyond what's physically on the wall. Main slot goes to
-          the featured prediction (falls back to the first published one);
-          the two flanking slots go to the next two, in order, and only fall
-          back to a "COMING SOON" placeholder when there genuinely isn't a
-          published prediction yet to fill that slot. */}
+      {/* ── Prediction boards — one per published prediction ── */}
+      {/* Every published prediction gets its own board, numbered left to
+          right as you walk in (see predictionsLayout.ts for the slot order).
+          All boards share one size and the large-type compact layout so they
+          read at a distance on a phone; the full text opens on tap, and the
+          wing's PredictionsMap walks you up to any board. */}
       {(() => {
         const published = getPublishedPredictions();
-        const mainPred = published.find((p) => p.featured) ?? published[0] ?? null;
-        const flanking = published.filter((p) => p.slug !== mainPred?.slug).slice(0, 2);
-        // Only increments when a slot actually needs a guessed number, so two
-        // empty slots get consecutive numbers instead of skipping one.
-        let placeholdersShown = 0;
-        const nextNumber = () => {
-          placeholdersShown += 1;
-          return `#${String(published.length + placeholdersShown).padStart(3, "0")}`;
-        };
-
-        // Pushed closer to the side walls than before (was ±0.9 from the
-        // room edge) to open up real breathing room around the main frame,
-        // which keeps its own size and position unchanged.
-        const FLANK_LEFT_X = ALCOVE_X_MIN + 0.65;
-        const FLANK_RIGHT_X = ALCOVE_X_MAX - 0.65;
-
-        return (
-          <>
-            {mainPred && (
-              <PredictionFrame
-                position={[ALCOVE_CX, 1.85, ALCOVE_Z_MIN + 0.01]}
-                rotation={[0, 0, 0]}
-                prediction={mainPred}
-                onSelect={onSelectPrediction}
-                width={1.7}
-                height={1.15}
-              />
-            )}
-
-            {flanking[0] ? (
-              <PredictionFrame
-                position={[FLANK_LEFT_X, 1.75, ALCOVE_Z_MIN + 0.01]}
-                rotation={[0, 0, 0]}
-                prediction={flanking[0]}
-                onSelect={onSelectPrediction}
-                width={1.0}
-                height={0.85}
-                compact
-              />
-            ) : (
-              <PlaceholderPredictionFrame
-                position={[FLANK_LEFT_X, 1.75, ALCOVE_Z_MIN + 0.01]}
-                rotation={[0, 0, 0]}
-                number={nextNumber()}
-              />
-            )}
-
-            {flanking[1] ? (
-              <PredictionFrame
-                position={[FLANK_RIGHT_X, 1.75, ALCOVE_Z_MIN + 0.01]}
-                rotation={[0, 0, 0]}
-                prediction={flanking[1]}
-                onSelect={onSelectPrediction}
-                width={1.0}
-                height={0.85}
-                compact
-              />
-            ) : (
-              <PlaceholderPredictionFrame
-                position={[FLANK_RIGHT_X, 1.75, ALCOVE_Z_MIN + 0.01]}
-                rotation={[0, 0, 0]}
-                number={nextNumber()}
-              />
-            )}
-          </>
-        );
+        const slots = getBoardSlots(published.length);
+        return slots.map((slot, i) => (
+          <PredictionFrame
+            key={published[i].slug}
+            position={slot.position}
+            rotation={slot.rotation}
+            prediction={published[i]}
+            onSelect={onSelectPrediction}
+            width={BOARD_WIDTH}
+            height={BOARD_HEIGHT}
+            compact
+            light={false}
+          />
+        ));
       })()}
 
-      {/* Side-wall accent frame — west wall */}
-      <group position={[ALCOVE_X_MIN + 0.015, 1.85, ALCOVE_CZ]} rotation={[0, Math.PI / 2, 0]}>
+      {/* One wash light per wall instead of one per board */}
+      <SpotLightWithTarget
+        position={[ALCOVE_CX, ALCOVE_HEIGHT - 0.2, ALCOVE_Z_MIN + 1.6]}
+        targetPosition={[ALCOVE_CX, 1.9, ALCOVE_Z_MIN]}
+        intensity={30}
+        angle={0.95}
+        penumbra={0.6}
+        distance={8}
+        castShadow={false}
+        color="#ffeedd"
+      />
+      <SpotLightWithTarget
+        position={[ALCOVE_X_MIN + 1.6, ALCOVE_HEIGHT - 0.2, ALCOVE_CZ]}
+        targetPosition={[ALCOVE_X_MIN, 1.9, ALCOVE_CZ]}
+        intensity={26}
+        angle={0.95}
+        penumbra={0.6}
+        distance={8}
+        castShadow={false}
+        color="#ffeedd"
+      />
+      <SpotLightWithTarget
+        position={[ALCOVE_X_MAX - 1.6, ALCOVE_HEIGHT - 0.2, ALCOVE_CZ]}
+        targetPosition={[ALCOVE_X_MAX, 1.9, ALCOVE_CZ]}
+        intensity={26}
+        angle={0.95}
+        penumbra={0.6}
+        distance={8}
+        castShadow={false}
+        color="#ffeedd"
+      />
+
+      {/* Accent frame — inside the door wall, left of the doorway (the side
+          walls now hold prediction boards) */}
+      <group position={[LEFT_SEG_CX, 1.85, ALCOVE_Z_MAX - 0.015]} rotation={[0, Math.PI, 0]}>
         <mesh position={[0, 0, -0.014]}>
           <boxGeometry args={[1.2, 0.85, 0.014]} />
           <meshStandardMaterial color="#c9a84c" metalness={0.7} roughness={0.3} />
