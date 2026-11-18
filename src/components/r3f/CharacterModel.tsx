@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useFBX } from "@react-three/drei";
 import * as THREE from "three";
-
-const CHARACTER_PATH = "/character-movement/character-base.fbx";
+import { ACTIVE_CHARACTER, prepareCharacter } from "./characters";
 
 // The source FBX embeds its Diffuse/Normal/Specular/Glossiness maps at
 // 4096x4096 each (Mixamo's default export) — ~250MB+ of GPU memory for a
@@ -37,9 +36,11 @@ function downscaleTexture(texture: THREE.Texture) {
   }
 }
 
-/** Loads the Mixamo character mesh + skeleton. Purely visual — no position/animation logic. */
+/** Loads the active Mixamo character mesh + skeleton, scaled to its
+ *  configured height. Purely visual — no position/animation logic. */
 export default function CharacterModel() {
-  const fbx = useFBX(CHARACTER_PATH);
+  const fbx = useFBX(ACTIVE_CHARACTER.path);
+  const { scale } = useMemo(() => prepareCharacter(fbx, ACTIVE_CHARACTER), [fbx]);
 
   useEffect(() => {
     fbx.traverse((child) => {
@@ -59,5 +60,9 @@ export default function CharacterModel() {
     });
   }, [fbx]);
 
-  return <primitive object={fbx} />;
+  return (
+    <group scale={scale}>
+      <primitive object={fbx} />
+    </group>
+  );
 }

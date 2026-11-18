@@ -4,6 +4,24 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "rea
 import { useFBX, useAnimations } from "@react-three/drei";
 import * as THREE from "three";
 import CharacterModel from "./CharacterModel";
+import { ACTIVE_CHARACTER, prepareCharacter, stripMixamoPrefix } from "./characters";
+
+// Retargets a Mixamo clip onto the active character: track names lose their
+// "mixamorigN" prefix (matching prepareCharacter's renamed nodes), and the
+// hips position track — the only position track Mixamo clips carry; every
+// other bone is rotation-only and transfers as-is — is rescaled from the
+// skeleton the clip was recorded on to this character's hip height.
+function retargetClip(clip: THREE.AnimationClip, hipsRatio: number): THREE.AnimationClip {
+  const out = clip.clone();
+  out.tracks.forEach((track) => {
+    const dot = track.name.indexOf(".");
+    track.name = stripMixamoPrefix(track.name.slice(0, dot)) + track.name.slice(dot);
+    if (hipsRatio !== 1 && track.name === "Hips.position") {
+      for (let i = 0; i < track.values.length; i++) track.values[i] *= hipsRatio;
+    }
+  });
+  return out;
+}
 
 export type MovementState = "idle" | "walk" | "walkBack" | "turnLeft" | "turnRight";
 
@@ -85,12 +103,22 @@ const AnimationController = forwardRef<AnimationControllerHandle>(function Anima
   const walkBackFbx = useFBX(CLIP_PATHS.walkBack);
   const turnLeftFbx = useFBX(CLIP_PATHS.turnLeft);
   const turnRightFbx = useFBX(CLIP_PATHS.turnRight);
+  const characterFbx = useFBX(ACTIVE_CHARACTER.path);
 
   const clips = useMemo(() => {
+    // All clips come from the same Mixamo skeleton; the idle clip's first
+    // frame gives that skeleton's hip height. Within 3% counts as the same
+    // build (e.g. the classic avatar) and is left untouched.
+    const { hipsHeight } = prepareCharacter(characterFbx, ACTIVE_CHARACTER);
+    const idleHips = idleFbx.animations[0]?.tracks.find((t) => /Hips\.position$/.test(t.name));
+    const sourceHips = idleHips ? idleHips.values[1] : hipsHeight;
+    const rawRatio = sourceHips > 0 ? hipsHeight / sourceHips : 1;
+    const hipsRatio = Math.abs(rawRatio - 1) < 0.03 ? 1 : rawRatio;
+
     // Idle is left completely untouched — it looks good as-is and has no
     // horizontal root motion to strip anyway.
     const named = (src: THREE.Group, name: MovementState, stripRootMotion: boolean) => {
-      let clip = src.animations[0]?.clone();
+      let clip = src.animations[0] ? retargetClip(src.animations[0], hipsRatio) : undefined;
       if (clip) {
         clip.name = name;
         if (stripRootMotion) clip = stripHipsRootMotion(clip);
@@ -104,7 +132,7 @@ const AnimationController = forwardRef<AnimationControllerHandle>(function Anima
       named(turnLeftFbx, "turnLeft", true),
       named(turnRightFbx, "turnRight", true),
     ].filter(Boolean) as THREE.AnimationClip[];
-  }, [idleFbx, walkFbx, walkBackFbx, turnLeftFbx, turnRightFbx]);
+  }, [idleFbx, walkFbx, walkBackFbx, turnLeftFbx, turnRightFbx, characterFbx]);
 
   const { actions } = useAnimations(clips, group);
   const currentState = useRef<MovementState>("idle");

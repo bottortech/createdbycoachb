@@ -6,10 +6,9 @@ import * as THREE from "three";
 import AnimationController, { AnimationControllerHandle, MovementState } from "./AnimationController";
 import { resolveMove, GALLERY_COLLIDERS } from "@/lib/collision";
 
-// Mixamo FBX characters are authored in centimeters — 0.01 brings the ~170cm
-// rig down to ~1.7 world units, matching the eye-height convention (1.7) the
-// rest of the gallery already uses for STOPS positions.
-const MODEL_SCALE = 0.01;
+// Character size is set per avatar (meters) in characters.ts — CharacterModel
+// scales each model to its configured height (~1.7-1.8 to match the
+// gallery's 1.7 eye-height convention used by STOPS positions).
 
 // If the character appears to walk backwards or sideways relative to the
 // direction it's actually moving, flip this by Math.PI — it corrects for
@@ -291,7 +290,7 @@ export default function CharacterController({
   });
 
   return (
-    <group ref={group} visible={active} scale={MODEL_SCALE}>
+    <group ref={group} visible={active}>
       <AnimationController ref={animRef} />
     </group>
   );
