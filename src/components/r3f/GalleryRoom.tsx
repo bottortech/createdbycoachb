@@ -118,6 +118,16 @@ export const STOPS: GalleryStop[] = [
   { pos: [3, 1.5, -9],        lookAt: [3, 1.3, -7.5],         label: "__vault_payments",      tier: 3 },
   { pos: [4.5, 1.5, -9],      lookAt: [4.5, 1.3, -7.5],       label: "__vault_gamedev",       tier: 3 },
   { pos: [6, 1.5, -9],        lookAt: [6, 1.3, -7.5],         label: "__vault_automation",    tier: 3 },
+  // Gallery II pieces — appended here (not next to the "Gallery II" stop) so
+  // no existing stop index shifts; the guided tour visits them as a detour
+  // right after "Gallery II", the same way it handles the vault cases.
+  // Labels must match the Gallery Map's STOP_META keys.
+  { pos: [-5.5, 1.7, GZ],     lookAt: [-5.5, 1.7, GZ + GW],    label: "Kinlo",                       tier: 2 },
+  { pos: [-7.5, 1.7, GZ],     lookAt: [-7.5, 1.7, GZ - GW],    label: "Bottor Learning Foundation",  tier: 3 },
+  { pos: [-10, 1.7, GZ],      lookAt: [-10, 1.7, GZ + GW],     label: "5 Star Craftsmanship",        tier: 3 },
+  { pos: [-12.5, 1.7, GZ],    lookAt: [-12.5, 1.7, GZ - GW],   label: "SIX Tune",                    tier: 2 },
+  { pos: [-15, 1.7, GZ],      lookAt: [-15, 1.7, GZ + GW],     label: "KLARITY",                     tier: 2 },
+  { pos: [-16.5, 1.7, GZ],    lookAt: [-19, 1.9, GZ],          label: "SIX",                         tier: 1 },
   // HIDDEN — routing waypoint only (see getWaypointRoute in GalleryScene.tsx).
   // The Entry Chamber's thin display panel (x:-0.95..0.95, z≈-1) sits between
   // the near-entrance corridor stops and the AI Predictions Wing doorway
@@ -154,6 +164,9 @@ export const PORTAL_STOP = TOUR_LAST + 1;
 // portal approach. Keep these constants in sync with the stops below.
 export const VAULT_CASE_START = PORTAL_STOP + 1;
 export const VAULT_CASE_COUNT = 7;
+// Gallery II piece stops follow the vault cases (see STOPS above).
+export const GALLERY_II_ART_START = VAULT_CASE_START + VAULT_CASE_COUNT;
+export const GALLERY_II_ART_COUNT = 6;
 // Routing waypoints (see getWaypointRoute in GalleryScene.tsx) — appended
 // last, in this fixed order, so they never shift the offsets above.
 export const BYPASS_PANEL_WEST_IDX = STOPS.length - 3;
@@ -188,7 +201,34 @@ interface ArtworkDef {
   noInteraction?: boolean;
 }
 
+// Gallery II (west wing, x=-19..0) — newer released work, walking west:
+// apps → websites → music → the SIX centerpiece on the west end wall.
+// North wall z=GZ+GW faces -z; south wall z=GZ-GW faces +z (its x=-3.5..-1.5
+// span is the AI Predictions Wing doorway, so south pieces stay west of it).
+// Wall frames are a fixed 3:2, so each uses a 3:2 crop of its project image
+// from /images/gallery/wall/ instead of being stretched.
+const wallImage = (id: string, file: string): Project => ({
+  ...getProject(id),
+  image: `/images/gallery/wall/${file}`,
+});
+const GALLERY_II_ARTWORKS: ArtworkDef[] = [
+  { position: [-5.5, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.2, frame: "landscape",
+    project: wallImage("kinlo", "kinlo.jpg") },
+  { position: [-7.5, 1.9, GZ - GW], rotation: [0, 0, 0], width: 1.2, frame: "landscape",
+    project: wallImage("bottor-learning-foundation", "bottor-learning-foundation.jpg") },
+  { position: [-10, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.2, frame: "landscape",
+    project: wallImage("five-star-craftsmanship", "five-star-craftsmanship.jpg") },
+  { position: [-12.5, 1.9, GZ - GW], rotation: [0, 0, 0], width: 1.2, frame: "landscape",
+    project: wallImage("six-tune", "six-tune.jpg") },
+  { position: [-15, 1.9, GZ + GW], rotation: [0, Math.PI, 0], width: 1.2, frame: "landscape",
+    project: wallImage("klarity", "klarity.jpg") },
+  // West end wall centerpiece — SIX, mirroring the book on the east end wall.
+  { position: [-19, 1.95, GZ], rotation: [0, Math.PI / 2, 0], width: 1.6, frame: "landscape",
+    project: wallImage("six", "six.jpg") },
+];
+
 const ARTWORKS: ArtworkDef[] = [
+  ...GALLERY_II_ARTWORKS,
   // Entry — WiggleWoo. Category overridden to "Featured Exhibit" for the
   // opening plaque; every other field comes from the shared project data.
   { position: [0, 1.95, -1], rotation: [0, 0, 0], width: 1.7, frame: "landscape",
@@ -1279,89 +1319,25 @@ export default function GalleryRoom({
       <mesh position={[-9.5, H - 0.08, GZ]}>
         <boxGeometry args={[19, 0.025, 0.025]} /><meshStandardMaterial color="#222" metalness={0.7} roughness={0.4} />
       </mesh>
-      {/* Gallery II — sealed wing, dim blue-gray lighting */}
-      {[-4, -9, -14].map((x, i) => (
-        <group key={`g2-sp-${x}`}>
-          <mesh position={[x, H - 0.15, GZ]} rotation={[0, 0, (i % 3 - 1) * 0.04]}>
-            <cylinderGeometry args={[0.04, 0.06, 0.1, 8]} /><meshStandardMaterial color="#222" metalness={0.8} roughness={0.3} />
+      {/* Gallery II — open wing. Warm track lights matching the main gallery,
+          each aimed at the piece on its wall (see GALLERY_II_ARTWORKS). */}
+      {GALLERY_II_ARTWORKS.filter((a) => a.rotation[1] !== Math.PI / 2).map((art, i) => (
+        <group key={`g2-sp-${i}`}>
+          <mesh position={[art.position[0], H - 0.15, GZ]} rotation={[0, 0, (i % 3 - 1) * 0.04]}>
+            <cylinderGeometry args={[0.04, 0.06, 0.1, 8]} /><meshStandardMaterial color="#333" metalness={0.8} roughness={0.3} />
           </mesh>
           <SpotLightWithTarget
-            position={[x, H - 0.2, GZ]}
-            targetPosition={[x, 1.5, GZ]}
-            intensity={5} angle={0.7} penumbra={0.9} distance={8} castShadow={false}
-            color="#8899bb"
+            position={[art.position[0], H - 0.2, GZ]}
+            targetPosition={[art.position[0], 1.5, art.position[2] > GZ ? GZ + GW - 0.3 : GZ - GW + 0.3]}
+            intensity={20} angle={0.65} penumbra={0.7} distance={10} castShadow={false}
           />
         </group>
       ))}
+      {/* West end wall centerpiece light (mirrors the east end wall's) */}
+      <SpotLightWithTarget position={[-17, H - 0.2, GZ]} targetPosition={[-18.9, 1.5, GZ]} intensity={28} angle={0.45} penumbra={0.6} />
 
-      {/* Velvet rope barrier — posts span corridor width (z-axis), rope reads head-on from entry camera */}
-      <group position={[-6, 0, 0]}>
-        {/* South post (near z=-4 wall) */}
-        <mesh position={[0, 0.6, GZ - GW + 0.5]}>
-          <cylinderGeometry args={[0.04, 0.04, 1.2, 8]} />
-          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
-        </mesh>
-        <mesh position={[0, 1.22, GZ - GW + 0.5]}>
-          <sphereGeometry args={[0.07, 10, 10]} />
-          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
-        </mesh>
-        {/* North post (near z=+1 wall) */}
-        <mesh position={[0, 0.6, GZ + GW - 0.5]}>
-          <cylinderGeometry args={[0.04, 0.04, 1.2, 8]} />
-          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
-        </mesh>
-        <mesh position={[0, 1.22, GZ + GW - 0.5]}>
-          <sphereGeometry args={[0.07, 10, 10]} />
-          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
-        </mesh>
-        {/* Rope in z-direction — rotation [PI/2,0,0] makes cylinder run along Z */}
-        <mesh position={[0, 0.9, GZ]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.018, 0.018, GW * 2 - 1, 8]} />
-          <meshStandardMaterial color="#8b1a1a" metalness={0.2} roughness={0.8} />
-        </mesh>
-      </group>
-
-      {/* Announcement sign — rotation [0,PI/2,0] makes it face east (+x) toward incoming camera */}
-      <group position={[-11, 0, GZ]} rotation={[0, Math.PI / 2, 0]}>
-        {/* Stand */}
-        <mesh position={[0, 0.5, 0]}>
-          <cylinderGeometry args={[0.025, 0.025, 1.0, 8]} />
-          <meshStandardMaterial color="#c9a84c" metalness={0.9} roughness={0.1} />
-        </mesh>
-        <mesh position={[0, 0.01, 0]}>
-          <boxGeometry args={[0.5, 0.04, 0.5]} />
-          <meshStandardMaterial color="#c9a84c" metalness={0.8} roughness={0.2} />
-        </mesh>
-        {/* Gold frame border */}
-        <mesh position={[0, 1.55, -0.02]}>
-          <boxGeometry args={[2.96, 1.26, 0.04]} />
-          <meshStandardMaterial color="#c9a84c" metalness={0.85} roughness={0.15} />
-        </mesh>
-        {/* Dark panel */}
-        <mesh position={[0, 1.55, 0.01]}>
-          <boxGeometry args={[2.8, 1.1, 0.05]} />
-          <meshStandardMaterial color="#0a0a12" metalness={0.3} roughness={0.7} />
-        </mesh>
-        <Text position={[0, 1.73, 0.045]} fontSize={0.16} color="rgba(201,168,76,0.9)" letterSpacing={0.35} textAlign="center" anchorX="center" anchorY="middle">
-          GALLERY II
-        </Text>
-        <Text position={[0, 1.50, 0.045]} fontSize={0.09} color="rgba(180,190,210,0.6)" letterSpacing={0.25} textAlign="center" anchorX="center" anchorY="middle">
-          OPENING SOON
-        </Text>
-        <Text position={[0, 1.32, 0.045]} fontSize={0.055} color="rgba(140,150,170,0.4)" letterSpacing={0.15} textAlign="center" anchorX="center" anchorY="middle">
-          New work coming
-        </Text>
-      </group>
-      {/* Spotlight on the sign, angled from above toward the sign face */}
-      <SpotLightWithTarget
-        position={[-7, H - 0.2, GZ]}
-        targetPosition={[-11, 1.55, GZ]}
-        intensity={14} angle={0.38} penumbra={0.55} distance={8} castShadow={false}
-        color="#c9a84c"
-      />
-
-      {/* Very faint ambient so the wing isn't pitch black */}
-      <pointLight position={[-9.5, 2.2, GZ]} intensity={0.25} distance={20} color="#6070a0" />
+      {/* Soft fill so the wing reads as part of the warm main gallery */}
+      <pointLight position={[-9.5, 2.2, GZ]} intensity={0.6} distance={20} color="#ffe8cc" />
 
       {/* Bottom gallery wall — split around the Tech Vault doorway (x=3..5, 2m wide) */}
       <mesh position={[1.5, H / 2, GZ - GW]} receiveShadow><planeGeometry args={[3, H]} /><meshStandardMaterial map={wallTex} color={wc} /></mesh>

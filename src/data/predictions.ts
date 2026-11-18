@@ -10,7 +10,8 @@ import type { PredictionMeta } from "@/types/prediction";
 export function getPublishedPredictions(): PredictionMeta[] {
   const now = Date.now();
   return PREDICTIONS.filter(
-    (p) => !p.releaseDate || new Date(p.releaseDate + "T00:00:00").getTime() <= now
+    (p) =>
+      !p.releaseDate || new Date(p.releaseDate + "T00:00:00").getTime() <= now,
   );
 }
 
@@ -21,10 +22,12 @@ export const PREDICTIONS: PredictionMeta[] = [
     number: "#001",
     title: "The Authenticity Shift",
     date: "2026-06-27",
-    summary: "AI will create abundance, and abundance will make authenticity more valuable.",
+    summary:
+      "AI will create abundance, and abundance will make authenticity more valuable.",
     category: "AI & Society",
     tags: ["AI", "Creativity", "Business", "Society"],
-    coreIdea: "AI will create abundance, and abundance will make authenticity more valuable.",
+    coreIdea:
+      "AI will create abundance, and abundance will make authenticity more valuable.",
     framework: [
       {
         stage: "Stage 1 — Automation",
@@ -61,7 +64,7 @@ export const PREDICTIONS: PredictionMeta[] = [
     title: "AI Will Become an Everyday Utility",
     date: "2026-07-27",
     summary:
-      "AI will follow the same adoption path as calculators, search engines, GPS, and smartphones, eventually becoming so common that people stop thinking about it as \"AI.\"",
+      'AI will follow the same adoption path as calculators, search engines, GPS, and smartphones, eventually becoming so common that people stop thinking about it as "AI."',
     category: "Artificial Intelligence",
     tags: [
       "Artificial Intelligence",
@@ -88,7 +91,7 @@ export const PREDICTIONS: PredictionMeta[] = [
       {
         stage: "Stage 3 — Invisible Infrastructure",
         description:
-          "AI becomes so integrated that people stop calling it AI, and simply say \"ask my phone,\" \"translate this,\" or \"summarize this meeting\" — the same way nobody says they're \"using GPS\" anymore, they just navigate.",
+          'AI becomes so integrated that people stop calling it AI, and simply say "ask my phone," "translate this," or "summarize this meeting" — the same way nobody says they\'re "using GPS" anymore, they just navigate.',
       },
     ],
     readingTime: 3,
@@ -158,6 +161,164 @@ export const PREDICTIONS: PredictionMeta[] = [
       "Coding a small app instead of answering programming questions.",
       "Building robots.",
       "Creating videos explaining concepts.",
+    ],
+  },
+  {
+    slug: "004-ai-transforms-accessibility",
+    id: "004",
+    number: "#004",
+    title: "AI Will Transform Accessibility",
+    date: "2026-09-27",
+    summary:
+      "Artificial intelligence will transform accessibility by reducing the barriers that prevent people with disabilities from independently participating in everyday life.",
+    category: "Accessibility & Artificial Intelligence",
+    tags: [
+      "Artificial Intelligence",
+      "Accessibility",
+      "Assistive Technology",
+      "Inclusive Design",
+      "Education",
+      "Independence",
+      "Innovation",
+    ],
+    coreIdea:
+      "Artificial intelligence will transform accessibility by reducing the barriers that prevent people with disabilities from independently participating in everyday life.",
+    framework: [],
+    readingTime: 3,
+    featured: false,
+    status: "watching",
+    lastUpdated: "2026-09-27",
+    updates: [],
+    releaseDate: "2026-09-27",
+    examples: [
+      "Printed books become interactive, accessible learning experiences.",
+      "Individuals with communication difficulties have more personalized ways to express themselves.",
+      "Students receive educational instruction adapted to their individual abilities.",
+      "Individuals with physical disabilities can control their environments through eye movements, voice commands, and other alternative inputs.",
+      "Everyday devices automatically adjust to the accessibility needs of their users.",
+    ],
+  },
+  {
+    slug: "005-ai-robotics-manual-labor",
+    id: "005",
+    number: "#005",
+    title: "AI and Robotics Will Transform Manual Labor",
+    date: "2026-10-27",
+    summary:
+      "The integration of artificial intelligence and robotics will fundamentally transform manual labor, making many physical tasks faster, more automated, and less dependent on direct human involvement.",
+    category: "Robotics & Future of Work",
+    tags: [
+      "Artificial Intelligence",
+      "Robotics",
+      "Automation",
+      "Manual Labor",
+      "Future of Work",
+      "Transportation",
+      "Manufacturing",
+      "Innovation",
+    ],
+    coreIdea:
+      "The integration of artificial intelligence and robotics will fundamentally transform manual labor, making many physical tasks faster, more automated, and less dependent on direct human involvement.",
+    framework: [],
+    readingTime: 3,
+    featured: false,
+    status: "watching",
+    lastUpdated: "2026-10-27",
+    updates: [],
+    releaseDate: "2026-10-27",
+    examples: [
+      "Automated automotive maintenance and repair stations.",
+      "Restaurants increasingly utilizing intelligent robotic food preparation systems.",
+      "Greater automation across construction and agriculture.",
+      "Autonomous transportation and delivery services becoming more common.",
+      "Workers transitioning toward robotic supervision, maintenance, programming, and quality control.",
+      "Businesses competing based on the speed and efficiency of automated physical services.",
+    ],
+  },
+  {
+    slug: "006-ai-electricity",
+    id: "006",
+    number: "#006",
+    title: "AI Will Transform How We Produce and Consume Electricity",
+    date: "2026-11-27",
+    summary:
+      "Artificial intelligence will transform how electricity is generated, stored, distributed, and consumed, shifting households and businesses from passive energy consumers toward active energy producers.",
+    category: "Energy & Artificial Intelligence",
+    tags: [
+      "Artificial Intelligence",
+      "Electricity",
+      "Solar Energy",
+      "Renewable Energy",
+      "Smart Grids",
+      "Battery Storage",
+      "Sustainability",
+      "Innovation",
+      "Infrastructure",
+      "Future of Energy",
+    ],
+    coreIdea:
+      "Artificial intelligence will transform how electricity is generated, stored, distributed, and consumed, shifting households and businesses from passive energy consumers toward active energy producers.",
+    framework: [],
+    readingTime: 4,
+    featured: false,
+    status: "watching",
+    lastUpdated: "2026-11-27",
+    updates: [],
+    releaseDate: "2026-11-27",
+    examples: [
+      "AI-powered residential and commercial energy management systems.",
+      "Greater integration of solar panels, battery storage, and artificial intelligence.",
+      "Automated purchasing and selling of electricity where regulations permit.",
+      "Neighborhoods operating interconnected energy networks.",
+      "Electric vehicles functioning as mobile energy storage systems.",
+      "AI-powered electrical grids that anticipate demand and identify potential failures.",
+      "Automated energy management systems that help reduce household electricity expenses.",
+      "Traditional utility companies adapting their business models to accommodate decentralized energy production.",
+      "New business opportunities centered around intelligent energy production, storage, and distribution.",
+    ],
+  },
+  {
+    slug: "007-ai-stock-market",
+    id: "007",
+    number: "#007",
+    title: "AI Will Reshape the Stock Market",
+    date: "2026-12-27",
+    summary:
+      "Artificial intelligence will fundamentally reshape the stock market by making sophisticated financial analysis more accessible to everyday investors while transforming how investment decisions are made and executed.",
+    category: "Finance & Artificial Intelligence",
+    tags: [
+      "Artificial Intelligence",
+      "Stock Market",
+      "Investing",
+      "Financial Technology",
+      "Algorithmic Trading",
+      "Automation",
+      "Financial Markets",
+      "Economics",
+      "AI Agents",
+      "Future of Finance",
+    ],
+    coreIdea:
+      "Artificial intelligence will fundamentally reshape the stock market by making sophisticated financial analysis more accessible to everyday investors while transforming how investment decisions are made and executed.",
+    framework: [],
+    readingTime: 5,
+    featured: false,
+    status: "watching",
+    lastUpdated: "2026-12-27",
+    updates: [],
+    releaseDate: "2026-12-27",
+    examples: [
+      "AI-powered personal investment assistants becoming mainstream.",
+      "Automated portfolio management tailored to individual financial goals.",
+      "Retail investors gaining access to increasingly sophisticated financial analysis.",
+      "Financial institutions competing through proprietary AI investment systems.",
+      "Companies offering specialized AI investment agents through subscription-based services.",
+      "AI systems executing investment decisions within investor-defined boundaries.",
+      "Investors comparing AI investment systems based on historical performance, reliability, strategy, and risk management.",
+      "New regulations specifically addressing autonomous financial agents.",
+      "Market disruptions linked to synchronized AI-driven trading decisions.",
+      "Growing demand for independent auditing of AI-powered investment systems.",
+      "Financial literacy increasingly including the ability to understand and manage AI-powered investment tools.",
     ],
   },
 ];

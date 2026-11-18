@@ -5,7 +5,7 @@ import { useProgress } from "@react-three/drei";
 import * as THREE from "three";
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, BYPASS_PANEL_WEST_IDX, BYPASS_GOAT_WEST_IDX, BYPASS_GOAT_EAST_IDX, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
+import GalleryRoom, { STOPS, TOUR_LAST, PORTAL_STOP, VAULT_CASE_START, VAULT_CASE_COUNT, GALLERY_II_ART_START, GALLERY_II_ART_COUNT, BYPASS_PANEL_WEST_IDX, BYPASS_GOAT_WEST_IDX, BYPASS_GOAT_EAST_IDX, MUSIC_ROOM_CAMERA } from "./GalleryRoom";
 import { BOOKING_PAYMENT_URL, LINKEDIN_URL, GITHUB_URL, ENTERPRISE_PDF_URL } from "@/lib/links";
 import { ENTERPRISE_DESCRIPTION, ENTERPRISE_SERVICES } from "@/data/enterprise";
 import ContactForm from "../ContactForm";
@@ -450,6 +450,10 @@ export default function GalleryScene() {
     () => STOPS.findIndex((s) => s.label === "Tech Vault"),
     []
   );
+  const galleryIIIdx = useMemo(
+    () => STOPS.findIndex((s) => s.label === "Gallery II"),
+    []
+  );
 
   // Guided tour stop sequence. The vault cases aren't adjacent to the gallery
   // stops in the STOPS array, so the tour visits them as a detour right after
@@ -457,13 +461,17 @@ export default function GalleryScene() {
   // then front row R→L) so the camera doesn't jog across the vault.
   const GUIDED_SEQUENCE = useMemo<number[]>(() => {
     const vaultOrder = [0, 1, 2, 6, 5, 4, 3].map((o) => VAULT_CASE_START + o);
+    // Gallery II pieces are likewise appended past the vault cases, so the
+    // tour walks the west wing (east → west) right after the "Gallery II" stop.
+    const galleryIIOrder = Array.from({ length: GALLERY_II_ART_COUNT }, (_, i) => GALLERY_II_ART_START + i);
     const seq: number[] = [];
     for (let i = 0; i <= TOUR_LAST; i++) {
       seq.push(i);
+      if (i === galleryIIIdx) seq.push(...galleryIIOrder);
       if (i === techVaultDoorwayIdx) seq.push(...vaultOrder);
     }
     return seq;
-  }, [techVaultDoorwayIdx]);
+  }, [techVaultDoorwayIdx, galleryIIIdx]);
 
   // True when a stop→stop transition would otherwise detour through unrelated
   // positions on the STOPS index axis (e.g. doorway idx 2 → vault case idx 16
@@ -493,7 +501,8 @@ export default function GalleryScene() {
   const zoneOf = useCallback(
     (idx: number): "predictions" | "techvault" | "corridor" => {
       if (PREDICTIONS_ZONE_INDICES.has(idx)) return "predictions";
-      if (idx === TECH_VAULT_DOORWAY_IDX || idx >= VAULT_CASE_START) return "techvault";
+      if (idx === TECH_VAULT_DOORWAY_IDX || (idx >= VAULT_CASE_START && idx < VAULT_CASE_START + VAULT_CASE_COUNT))
+        return "techvault";
       return "corridor";
     },
     []
@@ -511,7 +520,11 @@ export default function GalleryScene() {
   // idx 12) is deliberately excluded — that's the intended close-up stop.
   // Indices shifted +1 from Carla's Creation onward after inserting the
   // Vision Minds Entertainment stop ahead of them in STOPS.
-  const GOAT_WEST_INDICES = new Set([8, 9, 10, 11]); // Carla's Creation, JB TV, Lush Brows, RetroRack
+  // Gallery II pieces (west wing) are also west of the goat.
+  const GOAT_WEST_INDICES = new Set([
+    8, 9, 10, 11, // Carla's Creation, JB TV, Lush Brows, RetroRack
+    ...Array.from({ length: GALLERY_II_ART_COUNT }, (_, i) => GALLERY_II_ART_START + i),
+  ]);
   const GOAT_EAST_INDICES = new Set([13, 14, 15, 16, 17, 18, 19]); // RetroRack Logo .. Services
 
   // Returns the sequence of intermediate stop indices to hop through before

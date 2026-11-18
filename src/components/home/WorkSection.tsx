@@ -145,6 +145,12 @@ function GroupLabel({ children, count }: { children: string; count: number }) {
   );
 }
 
+/** Column classes chosen from the item count so no row ends with a lone card:
+ *  an odd final item spans the row at the two-column breakpoint. */
+function spanLast(i: number, count: number, cls: string) {
+  return count % 2 === 1 && i === count - 1 ? cls : "";
+}
+
 export default function WorkSection({ projects, onSelect }: WorkSectionProps) {
   const featured = projects.filter((p) => p.showcaseSize === "featured");
   const standard = projects.filter((p) => (p.showcaseSize ?? "standard") === "standard");
@@ -164,9 +170,13 @@ export default function WorkSection({ projects, onSelect }: WorkSectionProps) {
           {featured.length > 0 && (
             <div>
               <GroupLabel count={featured.length}>Flagship products</GroupLabel>
-              <div className="grid gap-5 sm:gap-6 lg:grid-cols-2">
-                {featured.map((p) => (
-                  <ProjectCard key={p.id} project={p} onSelect={onSelect} density="featured" />
+              <div
+                className={`grid gap-5 sm:gap-6 md:grid-cols-2 ${featured.length % 3 === 0 ? "xl:grid-cols-3" : ""}`}
+              >
+                {featured.map((p, i) => (
+                  <div key={p.id} className={spanLast(i, featured.length, "md:col-span-2 xl:col-span-1")}>
+                    <ProjectCard project={p} onSelect={onSelect} density="featured" />
+                  </div>
                 ))}
               </div>
             </div>
@@ -175,9 +185,13 @@ export default function WorkSection({ projects, onSelect }: WorkSectionProps) {
           {standard.length > 0 && (
             <div>
               <GroupLabel count={standard.length}>Apps, tools, books &amp; sites</GroupLabel>
-              <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
-                {standard.map((p) => (
-                  <ProjectCard key={p.id} project={p} onSelect={onSelect} density="standard" />
+              <div
+                className={`grid gap-5 sm:grid-cols-2 sm:gap-6 ${standard.length % 4 === 0 ? "xl:grid-cols-4" : "lg:grid-cols-3"}`}
+              >
+                {standard.map((p, i) => (
+                  <div key={p.id} className={spanLast(i, standard.length, "sm:col-span-2 lg:col-span-1")}>
+                    <ProjectCard project={p} onSelect={onSelect} density="standard" />
+                  </div>
                 ))}
               </div>
             </div>

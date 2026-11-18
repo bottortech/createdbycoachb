@@ -25,6 +25,13 @@ const STOP_META: Record<string, { thumb: string; type: string }> = {
   "Vision Minds Entertainment": { thumb: "/images/silke-vme-website.png", type: "Website Design" },
   "Ladi Luck Loyalty":          { thumb: "/images/loyalty-ladiluck-physical.png", type: "Loyalty Card Design" },
   "RYMA":                       { thumb: "/images/ryma-hero-virtual-studio.png", type: "Virtual Recording Studio (Web App)" },
+  // Gallery II (west wing)
+  "Kinlo":                      { thumb: "/images/kinlo-app.png",                type: "Mobile App (iPhone)" },
+  "Bottor Learning Foundation": { thumb: "/images/bottor-learning-foundation.jpg", type: "Nonprofit Website" },
+  "5 Star Craftsmanship":       { thumb: "/images/five-star-craftsmanship.jpg",  type: "Website Design" },
+  "SIX Tune":                   { thumb: "/images/six-tune-cover.jpg",           type: "Audio Plugin" },
+  "KLARITY":                    { thumb: "/images/klarity-cover.jpg",            type: "Audio Plugin" },
+  "SIX":                        { thumb: "/images/six-daw.jpg",                  type: "Digital Audio Workstation" },
 };
 
 interface GalleryMapProps {
